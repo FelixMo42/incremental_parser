@@ -48,7 +48,7 @@ impl Rule for PlaceholderRule {
 }
 
 // Symbol Rule
-impl Rule for &str {
+impl Rule for String {
     fn parse(&self, source: &mut Source) -> Node {
         source.skip_white_space();
         for chr in self.chars() {
@@ -63,6 +63,14 @@ impl Rule for &str {
 // Loop Rule
 struct Lots {
     rule: RuleId
+}
+
+impl Lots {
+    fn new(rule: RuleId) -> Box<Lots> {
+        return Box::new( Lots {
+            rule
+        } );
+    }
 }
 
 impl Rule for Lots {
@@ -87,11 +95,21 @@ impl Rule for EndOfFile {
 }
 
 // 
-struct Union (Vec<usize>);
+struct Union {
+    rules: Vec<usize>
+}
+
+impl Union {
+    fn new(rules: Vec<usize>) -> Box<Union> {
+        return Box::new( Union {
+            rules
+        } );
+    }
+}
 
 impl Rule for Union {
     fn parse(&self, source: &mut Source) -> Node {
-        for rule in self.0.iter() {
+        for rule in self.rules.iter() {
             source.skip_white_space();
             
             if source.eat_rule(*rule).info == NodeType::Error {
@@ -125,6 +143,14 @@ struct Opts {
     opts: Vec<RuleId>
 }
 
+impl Opts {
+    fn new(opts: Vec<RuleId>) -> Box<Opts> {
+        return Box::new(Opts {
+            opts
+        })
+    }
+}
+
 impl Rule for Opts {
     fn parse(&self, source: &mut Source) -> Node {
         for opt in self.opts.iter() {
@@ -136,63 +162,84 @@ impl Rule for Opts {
     }
 }
 
+pub struct Language {
+    pub rules: Vec<Box<dyn Rule>>
+}
+
+impl Language {
+    pub fn new() -> Language {
+        return Language {
+            rules: vec![]
+        }
+    }
+
+    pub fn add_rule(&mut self, rule: Box<dyn Rule>) -> usize {
+        self.rules.push(rule);
+        return self.rules.len() - 1;
+    }
+    
+    pub fn set_rule(&mut self, index: usize, rule: Box<dyn Rule>) {
+        self.rules[index] = rule;
+    }
+}
+
 // Main
 fn main() {
-    let src = &mut Source::new(r#"
+
+    let mut lang = Language::new();
+
+    let placeholder = Box::new(PlaceholderRule {});
+
+    // ident
+    let ident = lang.add_rule(Box::new(Ident {}));
+
+    // params
+    let params = lang.add_rule(Lots::new(ident));
+
+    // value
+    let value = lang.add_rule(placeholder);
+
+    // values
+    let values = lang.add_rule(Lots::new(value));
+
+    // call
+    let open_paren = lang.add_rule(Box::new("(".to_string()));
+    let close_paren = lang.add_rule(Box::new(")".to_string()));
+    let call = lang.add_rule(Union::new( vec![
+        open_paren,
+        ident,
+        values,
+        close_paren
+    ] ));
+    
+    // func
+    let open_braket = lang.add_rule(Box::new("[".to_string()));
+    let close_braket = lang.add_rule(Box::new("]".to_string()));
+    let func = lang.add_rule(Union::new( vec![
+        ident,
+        open_braket,
+        params,
+        close_braket,
+        value,
+    ] ));
+        
+    // add value
+    lang.set_rule(value, Opts::new(vec![
+        ident,
+        call
+    ]));
+    
+    let funcs = lang.add_rule(Lots::new(func));
+    let eof = lang.add_rule(Box::new(EndOfFile {}));
+    let file = lang.add_rule(Union::new( vec![
+        funcs,
+        eof
+    ] ));
+    
+    let src = &mut Source::new(&lang, r#"
         bla [ x y ] (add x y)
         main [args] (bla (unwrap args))
     "#);
-
-    let placeholder = &PlaceholderRule {};
-
-    // ident
-    let ident = src.add_rule(&Ident {});
-
-    // params
-    let params = &Lots { rule: ident };
-    let params = src.add_rule(params);
-
-    // value
-    let value = src.add_rule(placeholder);
-
-    // values
-    let values = &Lots { rule: value };
-    let values = src.add_rule(values);
-
-    // call
-    let call = &Union( vec![
-        src.add_rule(&"("),
-        ident,
-        values,
-        src.add_rule(&")")
-    ] );
-    let call = src.add_rule(call);
-
-    // func
-    let func = &Union( vec![
-        ident,
-        src.add_rule(&"["),
-        params,
-        src.add_rule(&"]"),
-        value,
-    ] );
-    let func = src.add_rule(func);
-    
-        
-    // add value
-    let v = &Opts { opts: vec![
-        ident,
-        call
-    ] };
-    src.set_rule(value, v);
-
-    let eof = &EndOfFile {};
-    let funcs = &Lots { rule: func };
-    let file = &Union( vec![
-        src.add_rule(funcs),
-        src.add_rule(eof),
-    ] );
-    let file = src.add_rule(file);
 
     let prs = src.eat_rule(file);
 
