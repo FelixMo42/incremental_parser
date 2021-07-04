@@ -1,8 +1,5 @@
 use std::{iter::Peekable, ops::RangeInclusive, str::CharIndices};
 
-pub mod source;
-pub mod language;
-
 struct Node (Vec<(RangeInclusive<char>, usize)>, bool);
 
 type Cursor<'a> = Peekable<CharIndices<'a>>;
