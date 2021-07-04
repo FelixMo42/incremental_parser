@@ -1,63 +1,16 @@
-use std::{iter::Peekable, ops::RangeInclusive, str::CharIndices};
+pub mod token;
 
-struct Node (Vec<(RangeInclusive<char>, usize)>, bool);
+use crate::token::{parse, Token, Node, Symbol};
 
-type Cursor<'a> = Peekable<CharIndices<'a>>;
-
-fn parse(nodes: &Vec<Node>, cursor: &mut Cursor) -> bool {
-    let mut index = 0;
-
-    'main: loop {
-        let node = &nodes[index];
-        
-        if let Some((_, chr)) = cursor.peek() {
-            for (case, i) in &node.0 {
-                if case.contains(chr) {
-                   index = i.clone();
-
-                   cursor.next();
-
-                   continue 'main;
-                }
-            }
-        }
-
-        if node.1 {
-            return true;
-        }
-        
-        return false;
-    }
-}
-
-struct Symbol<'a> {
-    span: (usize, usize),
-    kind: &'a Token,
-}
-
-struct Token(String, Vec<Node>);
-
-impl Token {
-    pub fn name(&self) -> &String {
-        return &self.0;
-    } 
-
-    pub fn nodes(&self) -> &Vec<Node> {
-        return &self.1;
-    } 
-}
-
-fn main() {
-    let src = "let name = ";
-
-    let const_let = Token("let".to_string(), vec![
+fn toks() -> Vec<Token> {
+    let const_let = Token::new("let".to_string(), vec![
         Node(vec![('l'..='l', 1)], false),
         Node(vec![('e'..='e', 2)], false),
         Node(vec![('t'..='t', 3)], false),
         Node(vec![], true),
     ]);
 
-    let ident = Token("ident".to_string(), vec![
+    let ident = Token::new("ident".to_string(), vec![
         Node(vec![
             ('a'..='z', 0),
             ('A'..='Z', 0),
@@ -66,37 +19,60 @@ fn main() {
         ], true),
     ]);
 
-    let whitespace = Token("whitespace".to_string(), vec![
+    let whitespace = Token::new("whitespace".to_string(), vec![
         Node(vec![
             ('\t'..=' ', 0)
         ], true)
     ]);
 
-    let punctuation = Token("punctuation".to_string(), vec![
+    let punctuation = Token::new("punctuation".to_string(), vec![
         Node(vec![
             ('!'..='/', 0),
             (':'..='@', 0),
         ], true)
     ]);
 
-    let tokens = vec![
+    return vec![
         whitespace,
         const_let,
         punctuation,
         ident,
     ];
+}
 
-    let mut cursor = src.char_indices().peekable();
+fn get_symbol(symbols: &Vec<Symbol>, cord: usize) -> usize {
+    for index in 0..symbols.len() {
+        if cord < symbols[index].span.1 {
+            return index;
+        }
+    }
+    return 0;
+}
 
-    let mut symbols: Vec<Symbol> = vec![];
+type Span = (usize, usize);
+
+fn edit<'a>(tokens: &'a Vec<Token>, symbols: &mut Vec<Symbol<'a>>, src: &str, edit: Span) {
+    // What is the index of the first symbol that could have been edited.
+    let mut index = get_symbol(&symbols, edit.0 - 1);
+
+    // How many characters were added?
+    let offset = edit.1 - edit.0;
+    
+    // Increment the span of each Symbol after the beginning of the edit.
+    for symbol in symbols.iter_mut().skip(index) {
+        symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
+    }
+
+    // Creat a cursor and skip to the cursor.
+    let mut cursor = src.char_indices().skip(symbols[index].span.0).peekable();
 
     while cursor.peek().is_some() {
-        for token in &tokens {
+        for token in tokens {
             // Keep a copy of the Cursor in case the parse fails.
             let mut save = cursor.clone();
 
             // Try to parse the token.
-            let mut success = parse(token.nodes(), &mut cursor);
+            let mut success = token.parse(&mut cursor);
 
             // Make that at least one token has been parsed.
             if save.peek() == cursor.peek() {
@@ -108,22 +84,58 @@ fn main() {
                 cursor = save.clone();
             }
 
-
             if success {
+                // Get the start and end point of the symbol.
                 let start = save.peek().unwrap().0;
                 let end = cursor.peek().map(|(i, _chr)| i.clone()).unwrap_or(src.len());
 
-                symbols.push(Symbol {
+                let symbol = Symbol {
                     span: (start, end),
                     kind: token,
-                });
+                };
 
-                break;
+                // If this is the same as the previously parsed symbol, then were done.
+                if symbols[index] == symbol {
+                    return
+                }
+
+                // Replace the old symbol if no longer needed, outherwise insert it.
+                if symbols[index].span.0 < symbol.span.0 {
+                    symbols[index] = symbol;
+                } else {
+                    symbols.insert(index, symbol);
+                }
+
+                // Move on the next symbol.
+                index += 1;
             }
         }
     }
 
-    for symbol in symbols {
-        println!("({}, {}) {}", symbol.span.0, symbol.span.1, symbol.kind.name());
+
+    println!("{}", index);
+}
+
+fn main() {
+    let src = "let name = abc + this_is_cool";
+
+    let tokens = toks();
+    let mut symbols = parse(src, &tokens);
+
+    println!("========");
+    for symbol in &symbols {
+        if symbol.kind != &tokens[0] {
+            println!("({}, {}) {}", symbol.span.0, symbol.span.1, symbol.kind.name);
+        }
+    }
+
+    let src = "let name = abc= + this_is_cool";
+    edit(&tokens, &mut symbols, src, (14, 15));
+
+    println!("========");
+    for symbol in &symbols {
+        if symbol.kind != &tokens[0] {
+            println!("({}, {}) {}", symbol.span.0, symbol.span.1, symbol.kind.name);
+        }
     }
 }
