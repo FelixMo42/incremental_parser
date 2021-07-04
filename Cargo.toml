@@ -5,4 +5,3 @@ authors = ["FelixMo42 <felix@tacocat.com>"]
 edition = "2018"
 
 [dependencies]
-typed-arena = "2.0.1"
