@@ -1,8 +1,10 @@
 pub mod token;
+pub mod parse;
 
 use std::fmt::Write;
 
-use crate::token::{parse, Token, Node, Symbol};
+use crate::token::{Token, Node, Symbol};
+use crate::parse::Parse;
 
 fn toks() -> Vec<Token> {
     let const_let = Token::new("let".to_string(), vec![
@@ -62,17 +64,17 @@ fn out(symbols: &Vec<Symbol>, src: &str) {
 
 fn main() {
     let tokens = toks();
-    let mut symbols: Vec<Symbol> = vec![];
+    let mut symbols = Parse::new(&tokens);
 
     let src = "let name = abc + this_is_cool";
-    parse(&tokens, &mut symbols, src, (0, src.len()));
+    symbols.parse(src, (0, src.len()));
 
     println!("=====");
-    out(&symbols, src);
+    out(&symbols.symbols, src);
     
     let src = "let name = abc= + this_is_cool";
-    parse(&tokens, &mut symbols, src, (14, 15));
+    symbols.parse(src, (14, 15));
 
     println!("=====");
-    out(&symbols, src);
+    out(&symbols.symbols, src);
 }
