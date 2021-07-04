@@ -1,6 +1,7 @@
 use std::{iter::{Peekable, Skip}, ops::RangeInclusive, str::CharIndices};
 
 pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
+pub type Span = (usize, usize);
 
 #[derive(PartialEq, Eq)]
 pub struct Node (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
@@ -52,10 +53,34 @@ impl Token {
     }
 }
 
-pub fn parse<'a>(src: &'a str, tokens: &'a Vec<Token>) -> Vec<Symbol<'a>> {
-    let mut cursor = src.char_indices().skip(0).peekable();
+fn get_symbol(symbols: &Vec<Symbol>, cord: usize) -> usize {
+    for index in 0..symbols.len() {
+        if cord <= symbols[index].span.1 {
+            return index;
+        }
+    }
 
-    let mut symbols: Vec<Symbol> = vec![];
+    return 0;
+}
+
+pub fn parse<'a>(tokens: &'a Vec<Token>, symbols: &mut Vec<Symbol<'a>>, src: &str, edit: Span) {
+    // What is the index of the first symbol that could have been edited.
+    let mut index = get_symbol(&symbols, edit.0);
+
+    // How many characters were added?
+    let offset = edit.1 - edit.0;
+    
+    // Increment the span of each Symbol after the beginning of the edit.
+    for symbol in symbols.iter_mut().skip(index) {
+        symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
+    }
+
+    // Creat a cursor and skip to the cursor.
+    let mut cursor = if symbols.len() != 0 {
+        src.char_indices().skip(symbols[index].span.0 - 1).peekable()
+    } else {
+        src.char_indices().skip(0).peekable()
+    };
 
     while cursor.peek().is_some() {
         for token in tokens {
@@ -75,23 +100,35 @@ pub fn parse<'a>(src: &'a str, tokens: &'a Vec<Token>) -> Vec<Symbol<'a>> {
                 cursor = save.clone();
             }
 
-            // The parse succeded, add it to symbols.
             if success {
                 // Get the start and end point of the symbol.
                 let start = save.peek().unwrap().0;
                 let end = cursor.peek().map(|(i, _chr)| i.clone()).unwrap_or(src.len());
 
-                // Create the symbol, and push it to the list.
-                symbols.push(Symbol {
+                let symbol = Symbol {
                     span: (start, end),
                     kind: token,
-                });
+                };
 
-                // Weve found the matching token, so we can exit now.
-                break;
+                if symbols.len() != index {
+                    // If this is the same as the previously parsed symbol, then were done.
+                    if symbols[index] == symbol {
+                        return
+                    }
+
+                    // Replace the old symbol if no longer needed, outherwise insert it.
+                    if symbols[index].span.0 < symbol.span.0 {
+                        symbols[index] = symbol;
+                    } else {
+                        symbols.insert(index, symbol);
+                    }
+                } else {
+                    symbols.push(symbol);
+                }
+
+                // Move on the next symbol.
+                index += 1;
             }
         }
     }
-
-    return symbols;
 }
