@@ -1,5 +1,7 @@
 pub mod token;
 
+use std::fmt::Write;
+
 use crate::token::{parse, Token, Node, Symbol};
 
 fn toks() -> Vec<Token> {
@@ -64,7 +66,7 @@ fn edit<'a>(tokens: &'a Vec<Token>, symbols: &mut Vec<Symbol<'a>>, src: &str, ed
     }
 
     // Creat a cursor and skip to the cursor.
-    let mut cursor = src.char_indices().skip(symbols[index].span.0).peekable();
+    let mut cursor = src.char_indices().skip(symbols[index].span.0 - 1).peekable();
 
     while cursor.peek().is_some() {
         for token in tokens {
@@ -111,31 +113,38 @@ fn edit<'a>(tokens: &'a Vec<Token>, symbols: &mut Vec<Symbol<'a>>, src: &str, ed
             }
         }
     }
+}
 
+fn out(symbols: &Vec<Symbol>, src: &str) {
+    let mut chars = src.chars();
 
-    println!("{}", index);
+    for symbol in symbols {
+        let mut value = "".to_string();
+
+        for _ in 0..(symbol.span.1 - symbol.span.0) {
+            value.write_char( chars.next().unwrap() ).unwrap();
+        }
+
+        if symbol.kind.name == "whitespace" {
+            continue; 
+        }
+        
+        println!("'{}' {}", value, symbol.kind.name);
+    }
 }
 
 fn main() {
     let src = "let name = abc + this_is_cool";
 
+    println!("=====");
     let tokens = toks();
     let mut symbols = parse(src, &tokens);
 
-    println!("========");
-    for symbol in &symbols {
-        if symbol.kind != &tokens[0] {
-            println!("({}, {}) {}", symbol.span.0, symbol.span.1, symbol.kind.name);
-        }
-    }
-
+    out(&symbols, src);
+    
+    println!("=====");
     let src = "let name = abc= + this_is_cool";
     edit(&tokens, &mut symbols, src, (14, 15));
 
-    println!("========");
-    for symbol in &symbols {
-        if symbol.kind != &tokens[0] {
-            println!("({}, {}) {}", symbol.span.0, symbol.span.1, symbol.kind.name);
-        }
-    }
+    out(&symbols, src);
 }
