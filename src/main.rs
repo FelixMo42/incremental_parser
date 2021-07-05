@@ -4,21 +4,21 @@ pub mod parse;
 use std::fmt::Write;
 
 use tblit::event::{Event, Key};
-use tblit::screen::Screen;
+use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
 
 use crate::token::{Token, Node, Symbol};
 use crate::parse::Parse;
 
 fn toks() -> Vec<Token> {
-    let const_let = Token::new("let".to_string(), vec![
+    let const_let = Token::new(Color(100, 0, 0), vec![
         Node(vec![('l'..='l', 1)], false),
         Node(vec![('e'..='e', 2)], false),
         Node(vec![('t'..='t', 3)], false),
         Node(vec![], true),
     ]);
 
-    let ident = Token::new("ident".to_string(), vec![
+    let ident = Token::new(Color(0, 100, 0), vec![
         Node(vec![
             ('a'..='z', 0),
             ('A'..='Z', 0),
@@ -27,22 +27,33 @@ fn toks() -> Vec<Token> {
         ], true),
     ]);
 
-    let whitespace = Token::new("whitespace".to_string(), vec![
+    let whitespace = Token::new(Color(0, 0, 0), vec![
         Node(vec![
             ('\t'..=' ', 0)
         ], true)
     ]);
 
-    let punctuation = Token::new("punctuation".to_string(), vec![
+    let punctuation = Token::new(Color(40, 40, 40), vec![
         Node(vec![
             ('!'..='/', 0),
             (':'..='@', 0),
         ], true)
     ]);
 
+    let number = Token::new(Color(0, 0, 100), vec![
+        Node(vec![
+            ('0'..='9', 0),
+            ('.'..='.', 1),
+        ], true),
+        Node(vec![
+            ('0'..='9', 1),
+        ], true)
+    ]);
+
     return vec![
         whitespace,
         const_let,
+        number,
         punctuation,
         ident,
     ];
@@ -51,21 +62,20 @@ fn toks() -> Vec<Token> {
 fn out(screen: &mut Screen, symbols: &Vec<Symbol>, src: &str) {
     let mut chars = src.chars();
 
-    for (y, symbol) in symbols.iter().enumerate() {
+    for symbol in symbols.iter() {
         for x in symbol.span.0..symbol.span.1 {
-            screen.set(chars.next().unwrap(), &Vec2::new(x, y));
+            screen.set(chars.next().unwrap(), symbol.kind.color, &Vec2::new(x, 0));
         }
     }
 }
 
-fn run() {
+fn main() {
     let mut src = "".to_string();
 
     let mut screen = Screen::new();
 
     let tokens = toks();
     let mut symbols = Parse::new(&tokens);
-
 
     for event in screen.events() {
         match event.unwrap() {
@@ -81,36 +91,3 @@ fn run() {
     }
 }
 
-fn print_symbols(symbols: &Parse) {
-    for symbol in &symbols.symbols {
-        print!("({}, {}) {}, ", symbol.span.0, symbol.span.1, symbol.kind.name);
-    }
-    println!("\n")
-}
-
-fn main() {
-    let debug = false;
-
-    if !debug {
-        run();
-    } else {
-        let tokens = toks();
-        let mut symbols = Parse::new(&tokens);
-
-        let chars = "abc = ";
-        let one_at_a_time = true;
-
-        if one_at_a_time {
-            for i in 0..chars.len() {
-                println!("= pass {} =", i);
-                let src = chars.get(0..=chars.char_indices().nth(i).unwrap().0).unwrap();
-                println!("src: {}", &src);
-                symbols.parse(src, (i, src.len()));
-                print_symbols(&symbols);
-            }
-        } else {
-            symbols.parse(chars, (0, chars.len()));
-            print_symbols(&symbols);
-        }
-    }
-}

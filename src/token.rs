@@ -1,4 +1,5 @@
 use std::{iter::{Peekable, Skip}, ops::RangeInclusive, str::CharIndices};
+use tblit::screen::Color;
 
 pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
 pub type Span = (usize, usize);
@@ -14,14 +15,14 @@ pub struct Symbol<'a> {
 
 #[derive(PartialEq, Eq)]
 pub struct Token {
-    pub name: String,
+    pub color: Color,
     pub nodes: Vec<Node>
 }
 
 impl Token {
-    pub fn new(name: String, nodes: Vec<Node>) -> Token {
+    pub fn new(color: Color, nodes: Vec<Node>) -> Token {
         return Token {
-            name,
+            color,
             nodes
         }
     }

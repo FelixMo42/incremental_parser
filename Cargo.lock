@@ -48,7 +48,7 @@ dependencies = [
 [[package]]
 name = "tblit"
 version = "0.2.0"
-source = "git+https://github.com/FelixMo42/tblit#4dd6779bc33456c89ac807eb06742575f5709e1d"
+source = "git+https://github.com/FelixMo42/tblit#3c7cb681df2857aa60c7189000ff410798119faa"
 dependencies = [
  "termion",
 ]
