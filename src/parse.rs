@@ -22,6 +22,26 @@ impl<'a> Parse<'a> {
             symbols: vec![]
         };
     }
+}
+
+impl<'a> Parse<'a> {
+    fn add_symbol(&mut self, index: usize, symbol: Symbol<'a>, edit: (usize, usize)) {
+        if self.symbols.len() != index {
+            // If this is the same as the previously parsed symbol, then were done.
+            if self.symbols[index] == symbol && symbol.span.1 > edit.1 {
+                return
+            }
+
+            // Replace the old symbol if no longer needed, outherwise insert it.
+            if self.symbols[index].span.0 <= symbol.span.0 {
+                self.symbols[index] = symbol;
+            } else {
+                self.symbols.insert(index, symbol);
+            }
+        } else {
+            self.symbols.push(symbol);
+        }
+    }
 
     pub fn parse(&mut self, src: &str, edit: (usize, usize)) {
         // What is the index of the first symbol that could have been edited.
@@ -42,7 +62,7 @@ impl<'a> Parse<'a> {
             src.char_indices().skip(0).peekable()
         };
 
-        while cursor.peek().is_some() {
+        'char_loop: while cursor.peek().is_some() {
             for token in self.tokens {
                 // Keep a copy of the Cursor in case the parse fails.
                 let mut save = cursor.clone();
@@ -70,26 +90,26 @@ impl<'a> Parse<'a> {
                         kind: &token,
                     };
 
-                    if self.symbols.len() != index {
-                        // If this is the same as the previously parsed symbol, then were done.
-                        if self.symbols[index] == symbol && symbol.span.1 > edit.1 {
-                            return
-                        }
-
-                        // Replace the old symbol if no longer needed, outherwise insert it.
-                        if self.symbols[index].span.0 <= symbol.span.0 {
-                            self.symbols[index] = symbol;
-                        } else {
-                            self.symbols.insert(index, symbol);
-                        }
-                    } else {
-                        self.symbols.push(symbol);
-                    }
+                    self.add_symbol(index, symbol, edit);
 
                     // Move on the next symbol.
                     index += 1;
+
+                    // Move on to next char
+                    continue 'char_loop;
                 }
             }
+            
+            /* let start = cursor.peek().unwrap().0;
+
+            self.add_symbol(index, Symbol {
+                span: (start, start + 1),
+                kind: &self.tokens[0]
+            }, edit);
+
+            cursor.next();
+
+            index += 1; */
         }
     }
 }

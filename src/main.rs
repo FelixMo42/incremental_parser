@@ -11,14 +11,14 @@ use crate::token::{Token, Node, Symbol};
 use crate::parse::Parse;
 
 fn toks() -> Vec<Token> {
-    let const_let = Token::new(Color(100, 0, 0), vec![
+    let const_let = Token::new(Color(186,108,72), vec![
         Node(vec![('l'..='l', 1)], false),
         Node(vec![('e'..='e', 2)], false),
         Node(vec![('t'..='t', 3)], false),
         Node(vec![], true),
     ]);
 
-    let ident = Token::new(Color(0, 100, 0), vec![
+    let ident = Token::new(Color(249, 245, 236), vec![
         Node(vec![
             ('a'..='z', 0),
             ('A'..='Z', 0),
@@ -33,14 +33,14 @@ fn toks() -> Vec<Token> {
         ], true)
     ]);
 
-    let punctuation = Token::new(Color(40, 40, 40), vec![
+    let punctuation = Token::new(Color(186,108,72), vec![
         Node(vec![
             ('!'..='/', 0),
             (':'..='@', 0),
         ], true)
     ]);
 
-    let number = Token::new(Color(0, 0, 100), vec![
+    let number = Token::new(Color(1,110,115), vec![
         Node(vec![
             ('0'..='9', 0),
             ('.'..='.', 1),
@@ -50,12 +50,21 @@ fn toks() -> Vec<Token> {
         ], true)
     ]);
 
+    let error = Token::new(Color(200, 0, 0), vec![
+        Node(vec![
+            ('\x00'..='~', 1),
+        ], false),
+        Node(vec![
+        ], true)
+    ]);
+
     return vec![
         whitespace,
         const_let,
         number,
         punctuation,
         ident,
+        error,
     ];
 }
 
