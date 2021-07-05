@@ -3,6 +3,10 @@ pub mod parse;
 
 use std::fmt::Write;
 
+use tblit::event::{Event, Key};
+use tblit::screen::Screen;
+use tblit::vec2::Vec2;
+
 use crate::token::{Token, Node, Symbol};
 use crate::parse::Parse;
 
@@ -44,37 +48,69 @@ fn toks() -> Vec<Token> {
     ];
 }
 
-fn out(symbols: &Vec<Symbol>, src: &str) {
+fn out(screen: &mut Screen, symbols: &Vec<Symbol>, src: &str) {
     let mut chars = src.chars();
 
-    for symbol in symbols {
-        let mut value = "".to_string();
-
-        for _ in 0..(symbol.span.1 - symbol.span.0) {
-            value.write_char( chars.next().unwrap() ).unwrap();
+    for (y, symbol) in symbols.iter().enumerate() {
+        for x in symbol.span.0..symbol.span.1 {
+            screen.set(chars.next().unwrap(), &Vec2::new(x, y));
         }
-
-        if symbol.kind.name == "whitespace" {
-            continue; 
-        }
-        
-        println!("'{}' {}", value, symbol.kind.name);
     }
 }
 
-fn main() {
+fn run() {
+    let mut src = "".to_string();
+
+    let mut screen = Screen::new();
+
     let tokens = toks();
     let mut symbols = Parse::new(&tokens);
 
-    let src = "let name = abc + this_is_cool";
-    symbols.parse(src, (0, src.len()));
 
-    println!("=====");
-    out(&symbols.symbols, src);
-    
-    let src = "let name = abc= + this_is_cool";
-    symbols.parse(src, (14, 15));
+    for event in screen.events() {
+        match event.unwrap() {
+            Event::Key(Key::Char(c)) => {
+                src.write_char(c).unwrap();     
+                symbols.parse(src.as_str(), (src.len() - 1, src.len()));
+                out(&mut screen, &symbols.symbols, &src);
+            }
+            _ => break
+            
+        }
+        screen.blit()
+    }
+}
 
-    println!("=====");
-    out(&symbols.symbols, src);
+fn print_symbols(symbols: &Parse) {
+    for symbol in &symbols.symbols {
+        print!("({}, {}) {}, ", symbol.span.0, symbol.span.1, symbol.kind.name);
+    }
+    println!("\n")
+}
+
+fn main() {
+    let debug = false;
+
+    if !debug {
+        run();
+    } else {
+        let tokens = toks();
+        let mut symbols = Parse::new(&tokens);
+
+        let chars = "abc = ";
+        let one_at_a_time = true;
+
+        if one_at_a_time {
+            for i in 0..chars.len() {
+                println!("= pass {} =", i);
+                let src = chars.get(0..=chars.char_indices().nth(i).unwrap().0).unwrap();
+                println!("src: {}", &src);
+                symbols.parse(src, (i, src.len()));
+                print_symbols(&symbols);
+            }
+        } else {
+            symbols.parse(chars, (0, chars.len()));
+            print_symbols(&symbols);
+        }
+    }
 }
