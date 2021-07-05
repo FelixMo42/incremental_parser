@@ -31,13 +31,13 @@ impl<'a> Parse<'a> {
         let offset = edit.1 - edit.0;
         
         // Increment the span of each Symbol after the beginning of the edit.
-        for symbol in self.symbols.iter_mut().skip(index) {
+        for symbol in self.symbols.iter_mut().skip(index + 1) {
             symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
         }
 
         // Creat a cursor and skip to the cursor.
         let mut cursor = if self.symbols.len() != 0 {
-            src.char_indices().skip(self.symbols[index].span.0 - 1).peekable()
+            src.char_indices().skip(self.symbols[index].span.0).peekable()
         } else {
             src.char_indices().skip(0).peekable()
         };
@@ -72,12 +72,12 @@ impl<'a> Parse<'a> {
 
                     if self.symbols.len() != index {
                         // If this is the same as the previously parsed symbol, then were done.
-                        if self.symbols[index] == symbol {
+                        if self.symbols[index] == symbol && symbol.span.1 > edit.1 {
                             return
                         }
 
                         // Replace the old symbol if no longer needed, outherwise insert it.
-                        if self.symbols[index].span.0 < symbol.span.0 {
+                        if self.symbols[index].span.0 <= symbol.span.0 {
                             self.symbols[index] = symbol;
                         } else {
                             self.symbols.insert(index, symbol);
@@ -93,3 +93,4 @@ impl<'a> Parse<'a> {
         }
     }
 }
+
