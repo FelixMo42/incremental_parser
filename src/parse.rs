@@ -25,24 +25,6 @@ impl<'a> Parse<'a> {
 }
 
 impl<'a> Parse<'a> {
-    fn add_symbol(&mut self, index: usize, symbol: Symbol<'a>, edit: (usize, usize)) {
-        if self.symbols.len() != index {
-            // If this is the same as the previously parsed symbol, then were done.
-            if self.symbols[index] == symbol && symbol.span.1 > edit.1 {
-                return
-            }
-
-            // Replace the old symbol if no longer needed, outherwise insert it.
-            if self.symbols[index].span.0 <= symbol.span.0 {
-                self.symbols[index] = symbol;
-            } else {
-                self.symbols.insert(index, symbol);
-            }
-        } else {
-            self.symbols.push(symbol);
-        }
-    }
-
     pub fn parse(&mut self, src: &str, edit: (usize, usize)) {
         // What is the index of the first symbol that could have been edited.
         let mut index = get_symbol(&self.symbols, edit.0);
@@ -55,14 +37,18 @@ impl<'a> Parse<'a> {
             symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
         }
 
+        if self.symbols.len() != 0 {
+            self.symbols[index].span.1 += offset;
+        }
+
         // Creat a cursor and skip to the cursor.
         let mut cursor = if self.symbols.len() != 0 {
             src.char_indices().skip(self.symbols[index].span.0).peekable()
         } else {
             src.char_indices().skip(0).peekable()
         };
-
-        'char_loop: while cursor.peek().is_some() {
+    
+        while cursor.peek().is_some() {
             for token in self.tokens {
                 // Keep a copy of the Cursor in case the parse fails.
                 let mut save = cursor.clone();
@@ -90,26 +76,33 @@ impl<'a> Parse<'a> {
                         kind: &token,
                     };
 
-                    self.add_symbol(index, symbol, edit);
+                    if self.symbols.len() != index {
+                        // If this is the same as the previously parsed symbol, then were done.
+                        if self.symbols[index] == symbol && symbol.span.1 > edit.1 {
+                            return
+                        }
+
+                        if self.symbols[index] == symbol {
+                            index += 1;
+                            break;
+                        }
+
+                        // Replace the old symbol if no longer needed, outherwise insert it.
+                        if symbol.span.0 <= self.symbols[index].span.0 {
+                            self.symbols[index] = symbol;
+                        } else {
+                            self.symbols.insert(index, symbol);
+                        }
+                    } else {
+                        self.symbols.push(symbol);
+                    }
 
                     // Move on the next symbol.
                     index += 1;
 
-                    // Move on to next char
-                    continue 'char_loop;
+                    break;
                 }
             }
-            
-            /* let start = cursor.peek().unwrap().0;
-
-            self.add_symbol(index, Symbol {
-                span: (start, start + 1),
-                kind: &self.tokens[0]
-            }, edit);
-
-            cursor.next();
-
-            index += 1; */
         }
     }
 }

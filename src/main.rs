@@ -1,8 +1,6 @@
 pub mod token;
 pub mod parse;
 
-use std::fmt::Write;
-
 use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
@@ -79,24 +77,37 @@ fn out(screen: &mut Screen, symbols: &Vec<Symbol>, src: &str) {
 }
 
 fn main() {
-    let mut src = "".to_string();
-
-    let mut screen = Screen::new();
-
     let tokens = toks();
     let mut symbols = Parse::new(&tokens);
 
+    let mut screen = Screen::new();
+
+    let mut src = "".to_string();
+
+    let mut index = 0;
+
     for event in screen.events() {
         match event.unwrap() {
-            Event::Key(Key::Char(c)) => {
-                src.write_char(c).unwrap();     
-                symbols.parse(src.as_str(), (src.len() - 1, src.len()));
+            Event::Key(Key::Char(chr)) => {
+                src.insert(index, chr);
+                symbols.parse(src.as_str(), (index, index + 1));
+                index += 1;
                 out(&mut screen, &symbols.symbols, &src);
             }
+            Event::Key(Key::Left) => {
+                if index != 0 {
+                    index -= 1;
+                }
+            },
+            Event::Key(Key::Right) => {
+                if index != src.len() {
+                    index += 1;
+                }
+            },
             _ => break
-            
         }
-        screen.blit()
+
+        screen.blit();
     }
 }
 
