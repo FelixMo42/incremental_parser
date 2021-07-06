@@ -2,7 +2,6 @@ use std::{iter::{Peekable, Skip}, ops::RangeInclusive, str::CharIndices};
 use tblit::screen::Color;
 
 pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
-pub type Span = (usize, usize);
 
 #[derive(PartialEq, Eq)]
 pub struct Node (pub Vec<(RangeInclusive<char>, usize)>, pub bool);

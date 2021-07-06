@@ -1,6 +1,7 @@
 pub mod token;
 pub mod parse;
 
+use parse::Edit;
 use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
@@ -90,8 +91,14 @@ fn main() {
         match event.unwrap() {
             Event::Key(Key::Char(chr)) => {
                 src.insert(index, chr);
-                symbols.parse(src.as_str(), (index, index + 1));
+                
+                symbols.parse(src.as_str(), Edit {
+                    span: (index, index + 1),
+                    insert: true,
+                });
+
                 index += 1;
+                
                 out(&mut screen, &symbols.symbols, &src);
             }
             Event::Key(Key::Left) => {
@@ -104,6 +111,22 @@ fn main() {
                     index += 1;
                 }
             },
+            Event::Key(Key::Backspace) => {
+                if index != 0 {
+                    src.remove(index - 1);
+
+                    symbols.parse(src.as_str(), Edit {
+                        span: (index - 1, index),
+                        insert: false,
+                    });
+
+                    screen.set(' ', Color(0, 0, 0), &Vec2::new(src.len(), 0));
+
+                    index -= 1;
+
+                    out(&mut screen, &symbols.symbols, &src);
+                }
+            }
             _ => break
         }
 

@@ -1,5 +1,12 @@
 use crate::token::{Symbol, Token};
 
+pub type Span = (usize, usize);
+
+pub struct Edit {
+    pub span: Span,
+    pub insert: bool
+}
+
 pub struct Parse<'a> {
     pub tokens: &'a Vec<Token>,
     pub symbols: Vec<Symbol<'a>>
@@ -25,20 +32,21 @@ impl<'a> Parse<'a> {
 }
 
 impl<'a> Parse<'a> {
-    pub fn parse(&mut self, src: &str, edit: (usize, usize)) {
+    pub fn parse(&mut self, src: &str, edit: Edit) {
         // What is the index of the first symbol that could have been edited.
-        let mut index = get_symbol(&self.symbols, edit.0);
+        let mut index = get_symbol(&self.symbols, edit.span.0);
 
-        // How many characters were added?
-        let offset = edit.1 - edit.0;
-        
-        // Increment the span of each Symbol after the beginning of the edit.
-        for symbol in self.symbols.iter_mut().skip(index + 1) {
-            symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
-        }
+        let offset = edit.span.1 - edit.span.0;
 
-        if self.symbols.len() != 0 {
-            self.symbols[index].span.1 += offset;
+        if edit.insert {
+            // Increment the span of each Symbol after the beginning of the edit.
+            for symbol in self.symbols.iter_mut().skip(index + 1) {
+                symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
+            }
+        } else {
+            for symbol in self.symbols.iter_mut().skip(index + 1) {
+                symbol.span = (symbol.span.0 - offset, symbol.span.1 - offset);
+            }
         }
 
         // Creat a cursor and skip to the cursor.
@@ -78,20 +86,23 @@ impl<'a> Parse<'a> {
 
                     if self.symbols.len() != index {
                         // If this is the same as the previously parsed symbol, then were done.
-                        if self.symbols[index] == symbol && symbol.span.1 > edit.1 {
+                        if self.symbols[index] == symbol && symbol.span.1 > edit.span.1 {
                             return
                         }
 
-                        if self.symbols[index] == symbol {
-                            index += 1;
-                            break;
-                        }
-
-                        // Replace the old symbol if no longer needed, outherwise insert it.
-                        if symbol.span.0 <= self.symbols[index].span.0 {
-                            self.symbols[index] = symbol;
-                        } else {
+                        if self.symbols[index].span.0 > symbol.span.0 {
                             self.symbols.insert(index, symbol);
+                        } else if self.symbols[index].span.0 == symbol.span.0 {
+                            self.symbols[index] = symbol
+                        } else {
+                            while self.symbols[index].span.0 < symbol.span.0 {
+                                self.symbols.remove(index);        
+                            }
+                            if self.symbols[index].span.0 > symbol.span.0 {
+                                self.symbols.insert(index, symbol);
+                            } else if symbol.span.0 == self.symbols[index].span.0 {
+                                self.symbols[index] = symbol
+                            }
                         }
                     } else {
                         self.symbols.push(symbol);
@@ -103,6 +114,10 @@ impl<'a> Parse<'a> {
                     break;
                 }
             }
+        }
+        
+        while self.symbols.len() > index {
+            self.symbols.remove(index);        
         }
     }
 }
