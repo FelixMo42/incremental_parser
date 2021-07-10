@@ -6,19 +6,19 @@ use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
 
-use crate::token::{Token, Node, Symbol};
+use crate::token::{Token, Rule, Symbol};
 use crate::parse::Parse;
 
 fn toks() -> Vec<Token> {
     let const_let = Token::new(Color(186,108,72), vec![
-        Node(vec![('l'..='l', 1)], false),
-        Node(vec![('e'..='e', 2)], false),
-        Node(vec![('t'..='t', 3)], false),
-        Node(vec![], true),
+        Rule(vec![('l'..='l', 1)], false),
+        Rule(vec![('e'..='e', 2)], false),
+        Rule(vec![('t'..='t', 3)], false),
+        Rule(vec![], true),
     ]);
 
     let ident = Token::new(Color(249, 245, 236), vec![
-        Node(vec![
+        Rule(vec![
             ('a'..='z', 0),
             ('A'..='Z', 0),
             ('_'..='_', 0),
@@ -27,33 +27,33 @@ fn toks() -> Vec<Token> {
     ]);
 
     let whitespace = Token::new(Color(0, 0, 0), vec![
-        Node(vec![
+        Rule(vec![
             ('\t'..=' ', 0)
         ], true)
     ]);
 
     let punctuation = Token::new(Color(186,108,72), vec![
-        Node(vec![
+        Rule(vec![
             ('!'..='/', 0),
             (':'..='@', 0),
         ], true)
     ]);
 
     let number = Token::new(Color(1,110,115), vec![
-        Node(vec![
+        Rule(vec![
             ('0'..='9', 0),
             ('.'..='.', 1),
         ], true),
-        Node(vec![
+        Rule(vec![
             ('0'..='9', 1),
         ], true)
     ]);
 
     let error = Token::new(Color(200, 0, 0), vec![
-        Node(vec![
+        Rule(vec![
             ('\x00'..='~', 1),
         ], false),
-        Node(vec![
+        Rule(vec![
         ], true)
     ]);
 

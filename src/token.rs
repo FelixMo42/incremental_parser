@@ -4,7 +4,7 @@ use tblit::screen::Color;
 pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
 
 #[derive(PartialEq, Eq)]
-pub struct Node (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
+pub struct Rule (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
 
 #[derive(PartialEq, Eq)]
 pub struct Symbol<'a> {
@@ -15,11 +15,11 @@ pub struct Symbol<'a> {
 #[derive(PartialEq, Eq)]
 pub struct Token {
     pub color: Color,
-    pub nodes: Vec<Node>
+    pub nodes: Vec<Rule>
 }
 
 impl Token {
-    pub fn new(color: Color, nodes: Vec<Node>) -> Token {
+    pub fn new(color: Color, nodes: Vec<Rule>) -> Token {
         return Token {
             color,
             nodes
