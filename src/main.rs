@@ -93,8 +93,8 @@ fn main() {
                 src.insert(index, chr);
                 
                 symbols.parse(src.as_str(), Edit {
-                    span: (index, index + 1),
-                    insert: true,
+                    span: (index, index),
+                    len: 1,
                 });
 
                 index += 1;
@@ -117,7 +117,7 @@ fn main() {
 
                     symbols.parse(src.as_str(), Edit {
                         span: (index - 1, index),
-                        insert: false,
+                        len: 0,
                     });
 
                     screen.set(' ', Color(0, 0, 0), &Vec2::new(src.len(), 0));

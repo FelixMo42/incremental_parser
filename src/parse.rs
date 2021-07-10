@@ -4,7 +4,7 @@ pub type Span = (usize, usize);
 
 pub struct Edit {
     pub span: Span,
-    pub insert: bool
+    pub len: usize
 }
 
 pub struct Parse<'a> {
@@ -36,17 +36,16 @@ impl<'a> Parse<'a> {
         // What is the index of the first symbol that could have been edited.
         let mut index = get_symbol(&self.symbols, edit.span.0);
 
-        let offset = edit.span.1 - edit.span.0;
 
-        if edit.insert {
-            // Increment the span of each Symbol after the beginning of the edit.
-            for symbol in self.symbols.iter_mut().skip(index + 1) {
-                symbol.span = (symbol.span.0 + offset, symbol.span.1 + offset);
-            }
-        } else {
-            for symbol in self.symbols.iter_mut().skip(index + 1) {
-                symbol.span = (symbol.span.0 - offset, symbol.span.1 - offset);
-            }
+        // How much was removed? 
+        let removed = edit.span.1 - edit.span.0;
+
+        // Increment the span of each Symbol after the beginning of the edit.
+        for symbol in self.symbols.iter_mut().skip(index + 1) {
+            symbol.span = (
+                symbol.span.0 - removed + edit.len,
+                symbol.span.1 - removed + edit.len
+            );
         }
 
         // Creat a cursor and skip to the cursor.
