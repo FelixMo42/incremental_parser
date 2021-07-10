@@ -4,7 +4,19 @@ use tblit::screen::Color;
 pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
 
 #[derive(PartialEq, Eq)]
-pub struct Rule (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
+pub struct Step (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
+
+impl Step {
+    #[inline]
+    pub fn rules(&self) -> &Vec<(RangeInclusive<char>, usize)> {
+        return &self.0;
+    }
+
+    #[inline]
+    pub fn done(&self) -> bool {
+        return self.1;
+    }
+}
 
 pub struct Language {
     pub rules: Vec<Token>
@@ -19,14 +31,14 @@ pub struct Node<'a> {
 #[derive(PartialEq, Eq)]
 pub struct Token {
     pub color: Color,
-    pub nodes: Vec<Rule>
+    pub steps: Vec<Step>
 }
 
 impl Token {
-    pub fn new(color: Color, nodes: Vec<Rule>) -> Token {
+    pub fn new(color: Color, steps: Vec<Step>) -> Token {
         return Token {
             color,
-            nodes
+            steps
         }
     }
 
@@ -34,11 +46,11 @@ impl Token {
         let mut index = 0;
 
         'main: loop {
-            let node = &self.nodes[index];
+            let step = &self.steps[index];
             
             if let Some((_, chr)) = cursor.peek() {
-                for (case, i) in &node.0 {
-                    if case.contains(chr) {
+                for (rule, i) in step.rules() {
+                    if rule.contains(chr) {
                        index = i.clone();
 
                        cursor.next();
@@ -48,7 +60,7 @@ impl Token {
                 }
             }
 
-            if node.1 {
+            if step.done() {
                 return true;
             }
             

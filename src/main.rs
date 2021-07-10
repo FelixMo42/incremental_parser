@@ -5,19 +5,19 @@ use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
 
-use crate::language::{Token, Rule, Node};
+use crate::language::{Token, Step, Node};
 use crate::document::{Document, Edit};
 
 fn toks() -> Vec<Token> {
     let const_let = Token::new(Color(186,108,72), vec![
-        Rule(vec![('l'..='l', 1)], false),
-        Rule(vec![('e'..='e', 2)], false),
-        Rule(vec![('t'..='t', 3)], false),
-        Rule(vec![], true),
+        Step(vec![('l'..='l', 1)], false),
+        Step(vec![('e'..='e', 2)], false),
+        Step(vec![('t'..='t', 3)], false),
+        Step(vec![], true),
     ]);
 
     let ident = Token::new(Color(249, 245, 236), vec![
-        Rule(vec![
+        Step(vec![
             ('a'..='z', 0),
             ('A'..='Z', 0),
             ('_'..='_', 0),
@@ -26,33 +26,33 @@ fn toks() -> Vec<Token> {
     ]);
 
     let whitespace = Token::new(Color(0, 0, 0), vec![
-        Rule(vec![
+        Step(vec![
             ('\t'..=' ', 0)
         ], true)
     ]);
 
     let punctuation = Token::new(Color(186,108,72), vec![
-        Rule(vec![
+        Step(vec![
             ('!'..='/', 0),
             (':'..='@', 0),
         ], true)
     ]);
 
     let number = Token::new(Color(1,110,115), vec![
-        Rule(vec![
+        Step(vec![
             ('0'..='9', 0),
             ('.'..='.', 1),
         ], true),
-        Rule(vec![
+        Step(vec![
             ('0'..='9', 1),
         ], true)
     ]);
 
     let error = Token::new(Color(200, 0, 0), vec![
-        Rule(vec![
+        Step(vec![
             ('\x00'..='~', 1),
         ], false),
-        Rule(vec![
+        Step(vec![
         ], true)
     ]);
 
