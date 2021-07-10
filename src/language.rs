@@ -6,8 +6,12 @@ pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
 #[derive(PartialEq, Eq)]
 pub struct Rule (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
 
+pub struct Language {
+    pub rules: Vec<Token>
+}
+
 #[derive(PartialEq, Eq)]
-pub struct Symbol<'a> {
+pub struct Node<'a> {
     pub span: (usize, usize),
     pub kind: &'a Token,
 }

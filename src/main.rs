@@ -1,13 +1,12 @@
-pub mod token;
-pub mod parse;
+pub mod language;
+pub mod document;
 
-use parse::Edit;
 use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
 
-use crate::token::{Token, Rule, Symbol};
-use crate::parse::Parse;
+use crate::language::{Token, Rule, Node};
+use crate::document::{Document, Edit};
 
 fn toks() -> Vec<Token> {
     let const_let = Token::new(Color(186,108,72), vec![
@@ -67,7 +66,7 @@ fn toks() -> Vec<Token> {
     ];
 }
 
-fn out(screen: &mut Screen, symbols: &Vec<Symbol>, src: &str) {
+fn out(screen: &mut Screen, symbols: &Vec<Node>, src: &str) {
     let mut chars = src.chars();
 
     for symbol in symbols.iter() {
@@ -79,7 +78,7 @@ fn out(screen: &mut Screen, symbols: &Vec<Symbol>, src: &str) {
 
 fn main() {
     let tokens = toks();
-    let mut symbols = Parse::new(&tokens);
+    let mut doc = Document::new(&tokens);
 
     let mut screen = Screen::new();
 
@@ -92,14 +91,14 @@ fn main() {
             Event::Key(Key::Char(chr)) => {
                 src.insert(index, chr);
                 
-                symbols.parse(src.as_str(), Edit {
+                doc.parse(src.as_str(), Edit {
                     span: (index, index),
                     len: 1,
                 });
 
                 index += 1;
                 
-                out(&mut screen, &symbols.symbols, &src);
+                out(&mut screen, &doc.nodes, &src);
             }
             Event::Key(Key::Left) => {
                 if index != 0 {
@@ -115,7 +114,7 @@ fn main() {
                 if index != 0 {
                     src.remove(index - 1);
 
-                    symbols.parse(src.as_str(), Edit {
+                    doc.parse(src.as_str(), Edit {
                         span: (index - 1, index),
                         len: 0,
                     });
@@ -124,7 +123,7 @@ fn main() {
 
                     index -= 1;
 
-                    out(&mut screen, &symbols.symbols, &src);
+                    out(&mut screen, &doc.nodes, &src);
                 }
             }
             _ => break
