@@ -1,4 +1,4 @@
-use crate::language::{Node, Token};
+use crate::language::{Language, Node, Token};
 
 pub type Span = (usize, usize);
 
@@ -23,7 +23,7 @@ fn get_node(nodes: &Vec<Node>, cord: usize) -> usize {
 }
 
 impl<'a> Document<'a> {
-    pub fn new(tokens: &'a Vec<Token>) -> Document<'a> {
+    pub fn new(tokens: &'a Language) -> Document<'a> {
         return Document {
             tokens,
             nodes: vec![]
@@ -60,7 +60,7 @@ impl<'a> Document<'a> {
                 let mut save = cursor.clone();
 
                 // Try to parse the token.
-                let mut success = token.parse(&mut cursor);
+                let mut success = token.parse(self.tokens, &mut cursor);
 
                 // Make that at least one token has been parsed.
                 if save.peek() == cursor.peek() {
@@ -80,6 +80,7 @@ impl<'a> Document<'a> {
                     let node = Node {
                         span: (start, end),
                         kind: &token,
+                        subs: vec![],
                     };
 
                     if self.nodes.len() != index {

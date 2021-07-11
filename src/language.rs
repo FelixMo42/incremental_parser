@@ -1,14 +1,40 @@
 use std::{iter::{Peekable, Skip}, ops::RangeInclusive, str::CharIndices};
 use tblit::screen::Color;
 
-pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
+/* Node */
 
 #[derive(PartialEq, Eq)]
-pub struct Step (pub Vec<(RangeInclusive<char>, usize)>, pub bool);
+pub struct Node<'a> {
+    pub span: (usize, usize),
+    pub kind: &'a Token,
+    pub subs: Vec<Node<'a>>
+}
+
+#[derive(PartialEq, Eq)]
+pub enum Rule {
+    Char(RangeInclusive<char>),
+    Token(usize)
+}
+
+impl Rule {
+    fn parse(&self, lang: &Language, cursor: &mut Cursor) -> bool {
+        match self {
+            Rule::Char(range) => {
+                cursor.next_if(|(i, chr)| range.contains(chr)).is_some()
+            },
+            _ => false  
+        }
+    }
+}
+
+/* Step */
+
+#[derive(PartialEq, Eq)]
+pub struct Step (pub Vec<(Rule, usize)>, pub bool);
 
 impl Step {
     #[inline]
-    pub fn rules(&self) -> &Vec<(RangeInclusive<char>, usize)> {
+    pub fn rules(&self) -> &Vec<(Rule, usize)> {
         return &self.0;
     }
 
@@ -18,21 +44,20 @@ impl Step {
     }
 }
 
-pub struct Language {
-    pub rules: Vec<Token>
-}
+/* Cursor */
 
-#[derive(PartialEq, Eq)]
-pub struct Node<'a> {
-    pub span: (usize, usize),
-    pub kind: &'a Token,
-}
+pub type Language = Vec<Token>;
+
+pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
+
+/* Token */
 
 #[derive(PartialEq, Eq)]
 pub struct Token {
     pub color: Color,
     pub steps: Vec<Step>
 }
+
 
 impl Token {
     pub fn new(color: Color, steps: Vec<Step>) -> Token {
@@ -42,21 +67,17 @@ impl Token {
         }
     }
 
-    pub fn parse(&self, cursor: &mut Cursor) -> bool {
+    pub fn parse(&self, lang: &Language, cursor: &mut Cursor) -> bool {
         let mut index = 0;
 
         'main: loop {
             let step = &self.steps[index];
             
-            if let Some((_, chr)) = cursor.peek() {
-                for (rule, i) in step.rules() {
-                    if rule.contains(chr) {
-                       index = i.clone();
-
-                       cursor.next();
-
-                       continue 'main;
-                    }
+            for (rule, i) in step.rules() {
+                if rule.parse(lang, cursor) {
+                    index = i.clone();
+                    
+                    continue 'main;
                 }
             }
 

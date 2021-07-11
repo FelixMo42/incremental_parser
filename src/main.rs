@@ -5,52 +5,52 @@ use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
 
-use crate::language::{Token, Step, Node};
+use crate::language::{Node, Rule, Step, Token};
 use crate::document::{Document, Edit};
 
 fn toks() -> Vec<Token> {
     let const_let = Token::new(Color(186,108,72), vec![
-        Step(vec![('l'..='l', 1)], false),
-        Step(vec![('e'..='e', 2)], false),
-        Step(vec![('t'..='t', 3)], false),
+        Step(vec![(Rule::Char('l'..='l'), 1)], false),
+        Step(vec![(Rule::Char('e'..='e'), 2)], false),
+        Step(vec![(Rule::Char('t'..='t'), 3)], false),
         Step(vec![], true),
     ]);
 
     let ident = Token::new(Color(249, 245, 236), vec![
         Step(vec![
-            ('a'..='z', 0),
-            ('A'..='Z', 0),
-            ('_'..='_', 0),
-            ('\''..='\'', 0),
+            (Rule::Char('a'..='z'), 0),
+            (Rule::Char('A'..='Z'), 0),
+            (Rule::Char('_'..='_'), 0),
+            (Rule::Char('\''..='\''), 0),
         ], true),
     ]);
 
     let whitespace = Token::new(Color(0, 0, 0), vec![
         Step(vec![
-            ('\t'..=' ', 0)
+            (Rule::Char('\t'..=' '), 0)
         ], true)
     ]);
 
     let punctuation = Token::new(Color(186,108,72), vec![
         Step(vec![
-            ('!'..='/', 0),
-            (':'..='@', 0),
+            (Rule::Char('!'..='/'), 0),
+            (Rule::Char(':'..='@'), 0),
         ], true)
     ]);
 
     let number = Token::new(Color(1,110,115), vec![
         Step(vec![
-            ('0'..='9', 0),
-            ('.'..='.', 1),
+            (Rule::Char('0'..='9'), 0),
+            (Rule::Char('.'..='.'), 1),
         ], true),
         Step(vec![
-            ('0'..='9', 1),
+            (Rule::Char('0'..='9'), 1),
         ], true)
     ]);
 
     let error = Token::new(Color(200, 0, 0), vec![
         Step(vec![
-            ('\x00'..='~', 1),
+            (Rule::Char('\x00'..='~'), 1),
         ], false),
         Step(vec![
         ], true)
