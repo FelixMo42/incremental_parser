@@ -1,4 +1,4 @@
-use crate::language::{Language, Node, Token};
+use crate::language::{Cursor, Language, Node, Token};
 
 pub type Span = (usize, usize);
 
@@ -48,34 +48,24 @@ impl<'a> Document<'a> {
         }
 
         // Creat a cursor and skip to the cursor.
-        let mut cursor = if self.nodes.len() != 0 {
+        let mut cursor = Cursor::new(if self.nodes.len() != 0 {
             src.char_indices().skip(self.nodes[index].span.0).peekable()
         } else {
             src.char_indices().skip(0).peekable()
-        };
+        });
     
-        while cursor.peek().is_some() {
+        while !cursor.done() {
             for token in self.tokens {
                 // Keep a copy of the Cursor in case the parse fails.
-                let mut save = cursor.clone();
+                let mut save = cursor.save();
 
                 // Try to parse the token.
-                let mut success = token.parse(self.tokens, &mut cursor);
-
-                // Make that at least one token has been parsed.
-                if save.peek() == cursor.peek() {
-                    success = false;
-                }
-
-                // If the parse failed, restore the old cursor.
-                if !success {
-                    cursor = save.clone();
-                }
+                let success = token.parse(self.tokens, &mut cursor);
 
                 if success {
                     // Get the start and end point of the node.
                     let start = save.peek().unwrap().0;
-                    let end = cursor.peek().map(|(i, _chr)| i.clone()).unwrap_or(src.len());
+                    let end = cursor.chars.peek().map(|(i, _)| i.clone()).unwrap_or(src.len());
 
                     let node = Node {
                         span: (start, end),

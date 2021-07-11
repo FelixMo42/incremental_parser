@@ -16,7 +16,16 @@ fn toks() -> Vec<Token> {
         Step(vec![], true),
     ]);
 
-    let ident = Token::new(Color(249, 245, 236), vec![
+    let name = Token::new(Color(249, 245, 235), vec![
+        Step(vec![
+             (Rule::Token(5), 0)
+        ], true),
+        Step(vec![
+             (Rule::Token(0), 1)
+        ], false),
+    ]);
+
+    let word = Token::new(Color(10, 245, 0), vec![
         Step(vec![
             (Rule::Char('a'..='z'), 0),
             (Rule::Char('A'..='Z'), 0),
@@ -57,12 +66,13 @@ fn toks() -> Vec<Token> {
     ]);
 
     return vec![
-        whitespace,
-        const_let,
-        number,
-        punctuation,
-        ident,
-        error,
+        whitespace,  // 0
+        const_let,   // 1
+        number,      // 2
+        punctuation, // 3
+        name,        // 4
+        word,        // 5
+        error,       // 6
     ];
 }
 

@@ -20,9 +20,11 @@ impl Rule {
     fn parse(&self, lang: &Language, cursor: &mut Cursor) -> bool {
         match self {
             Rule::Char(range) => {
-                cursor.next_if(|(i, chr)| range.contains(chr)).is_some()
+                cursor.chars.next_if(|(_, chr)| range.contains(chr)).is_some()
             },
-            _ => false  
+            Rule::Token(token) => {
+                return lang[*token].parse(lang, cursor);
+            }
         }
     }
 }
@@ -39,7 +41,7 @@ impl Step {
     }
 
     #[inline]
-    pub fn done(&self) -> bool {
+    pub fn is_final(&self) -> bool {
         return self.1;
     }
 }
@@ -48,7 +50,34 @@ impl Step {
 
 pub type Language = Vec<Token>;
 
-pub type Cursor<'a> = Peekable<Skip<CharIndices<'a>>>;
+type CursorIter<'a> = Peekable<Skip<CharIndices<'a>>>;
+
+#[derive(Clone)]
+pub struct Cursor<'a> {
+    pub chars: CursorIter<'a> 
+}
+
+impl<'a> Cursor<'a> {
+    pub fn new(chars: Peekable<Skip<CharIndices<'a>>>) -> Cursor<'a> {
+        return Cursor { chars };
+    }
+
+    pub fn done(&mut self) -> bool {
+        return self.chars.peek().is_none();
+    }
+
+    pub fn save(&self) -> Peekable<Skip<CharIndices<'a>>> {
+        return self.chars.clone();
+    }
+
+    pub fn restore(&mut self, save: CursorIter<'a>) {
+        self.chars = save;
+    }
+
+    pub fn advanced_from(&mut self, save: &mut CursorIter<'a>) -> bool {
+        self.chars.peek() != save.peek()
+    }
+} 
 
 /* Token */
 
@@ -69,24 +98,26 @@ impl Token {
 
     pub fn parse(&self, lang: &Language, cursor: &mut Cursor) -> bool {
         let mut index = 0;
+        let mut save = cursor.save();
 
-        'main: loop {
-            let step = &self.steps[index];
-            
-            for (rule, i) in step.rules() {
-                if rule.parse(lang, cursor) {
-                    index = i.clone();
-                    
-                    continue 'main;
-                }
-            }
-
-            if step.done() {
+        while self.steps[index].rules().iter().any(|(rule, i)| {
+            if rule.parse(lang, cursor) {
+                index = i.clone();
                 return true;
             }
-            
-            return false;
+
+            return false
+        }) {}
+
+        let success =
+            self.steps[index].is_final() &&
+            cursor.advanced_from(&mut save);
+
+        if !success {
+            cursor.restore(save);
         }
+
+        return success
     }
 }
 
