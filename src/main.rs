@@ -18,10 +18,10 @@ fn toks() -> Vec<Token> {
 
     let name = Token::new(Color(249, 245, 235), vec![
         Step(vec![
-             (Rule::Token(5), 0)
+             (Rule::Token(6), 0)
         ], true),
         Step(vec![
-             (Rule::Token(0), 1)
+             (Rule::Token(1), 1)
         ], false),
     ]);
 
@@ -65,14 +65,26 @@ fn toks() -> Vec<Token> {
         ], true)
     ]);
 
+    let file = Token::new(Color(255, 255, 255), vec![
+        Step(vec![
+            (Rule::Token(1), 0),
+            (Rule::Token(2), 0),
+            (Rule::Token(3), 0),
+            (Rule::Token(4), 0),
+            (Rule::Token(5), 0),
+            (Rule::Token(7), 0),
+        ], true)
+    ]);
+
     return vec![
-        whitespace,  // 0
-        const_let,   // 1
-        number,      // 2
-        punctuation, // 3
-        name,        // 4
-        word,        // 5
-        error,       // 6
+        file,        // 0
+        whitespace,  // 1
+        const_let,   // 2
+        number,      // 3
+        punctuation, // 4
+        name,        // 5
+        word,        // 6
+        error,       // 7
     ];
 }
 

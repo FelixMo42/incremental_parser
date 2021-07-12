@@ -34,45 +34,39 @@ impl<'a> Document<'a> {
 impl<'a> Document<'a> {
     pub fn parse(&mut self, src: &str, edit: Edit) {
         // What is the index of the first node that could have been edited.
-        let mut index = get_node(&self.nodes, edit.span.0);
+        // let mut index = get_node(&self.nodes, edit.span.0);
 
         // How much was removed? 
-        let removed = edit.span.1 - edit.span.0;
+        // let removed = edit.span.1 - edit.span.0;
 
         // Increment the span of each Symbol after the beginning of the edit.
-        for node in self.nodes.iter_mut().skip(index + 1) {
+        /* for node in self.nodes.iter_mut().skip(index + 1) {
             node.span = (
                 node.span.0 - removed + edit.len,
                 node.span.1 - removed + edit.len
             );
-        }
+        } */
 
         // Creat a cursor and skip to the cursor.
-        let mut cursor = Cursor::new(if self.nodes.len() != 0 {
-            src.char_indices().skip(self.nodes[index].span.0).peekable()
+        /* let mut cursor = Cursor::new(src, if self.nodes.len() != 0 {
+            self.nodes[index].span.0
         } else {
-            src.char_indices().skip(0).peekable()
-        });
+            0
+        }); */
+
+        let mut cursor = Cursor::new(src, 0);
+
+        let node = self.tokens[0].parse(self.tokens, &mut cursor).unwrap();
+
+        if !cursor.done() {
+            panic!("unexpected end of file");
+        }
+
+        self.nodes = vec![ node ];
     
-        while !cursor.done() {
+        /* while !cursor.done() {
             for token in self.tokens {
-                // Keep a copy of the Cursor in case the parse fails.
-                let mut save = cursor.save();
-
-                // Try to parse the token.
-                let success = token.parse(self.tokens, &mut cursor);
-
-                if success {
-                    // Get the start and end point of the node.
-                    let start = save.peek().unwrap().0;
-                    let end = cursor.chars.peek().map(|(i, _)| i.clone()).unwrap_or(src.len());
-
-                    let node = Node {
-                        span: (start, end),
-                        kind: &token,
-                        subs: vec![],
-                    };
-
+                if let Some(node) = token.parse(self.tokens, &mut cursor) {
                     if self.nodes.len() != index {
                         // If this is the same as the previously parsed node, then were done.
                         if self.nodes[index] == node && node.span.1 > edit.span.1 {
@@ -107,7 +101,7 @@ impl<'a> Document<'a> {
         
         while self.nodes.len() > index {
             self.nodes.remove(index);        
-        }
+        } */
     }
 }
 

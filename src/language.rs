@@ -10,6 +10,8 @@ pub struct Node<'a> {
     pub subs: Vec<Node<'a>>
 }
 
+/* Rule */
+
 #[derive(PartialEq, Eq)]
 pub enum Rule {
     Char(RangeInclusive<char>),
@@ -17,13 +19,17 @@ pub enum Rule {
 }
 
 impl Rule {
-    fn parse(&self, lang: &Language, cursor: &mut Cursor) -> bool {
+    fn parse<'a>(&self, lang: &'a Language, cursor: &mut Cursor) -> Option<Node<'a>> {
         match self {
             Rule::Char(range) => {
-                cursor.chars.next_if(|(_, chr)| range.contains(chr)).is_some()
+                cursor.chars.next_if(|(_, chr)| range.contains(chr)).map(|(i, _)| Node {
+                    span: (i, i + 1),
+                    kind: &lang[0],
+                    subs: vec![]
+                })
             },
             Rule::Token(token) => {
-                return lang[*token].parse(lang, cursor);
+                lang[*token].parse(lang, cursor)
             }
         }
     }
@@ -54,12 +60,16 @@ type CursorIter<'a> = Peekable<Skip<CharIndices<'a>>>;
 
 #[derive(Clone)]
 pub struct Cursor<'a> {
+    pub src: &'a str,
     pub chars: CursorIter<'a> 
 }
 
 impl<'a> Cursor<'a> {
-    pub fn new(chars: Peekable<Skip<CharIndices<'a>>>) -> Cursor<'a> {
-        return Cursor { chars };
+    pub fn new(src: &'a str, start: usize) -> Cursor<'a> {
+        return Cursor {
+            src,
+            chars: src.char_indices().skip(start).peekable()
+        };
     }
 
     pub fn done(&mut self) -> bool {
@@ -76,6 +86,13 @@ impl<'a> Cursor<'a> {
 
     pub fn advanced_from(&mut self, save: &mut CursorIter<'a>) -> bool {
         self.chars.peek() != save.peek()
+    }
+
+    pub fn get_span(&mut self, save: &mut CursorIter<'a>) -> (usize, usize) {
+        return (
+            save.peek().unwrap().0,
+            self.chars.peek().map(|(i, _)| i.clone()).unwrap_or(self.src.len())
+        )
     }
 } 
 
@@ -96,12 +113,14 @@ impl Token {
         }
     }
 
-    pub fn parse(&self, lang: &Language, cursor: &mut Cursor) -> bool {
+    pub fn parse<'a>(&'a self, lang: &'a Language, cursor: &mut Cursor) -> Option<Node<'a>> {
         let mut index = 0;
         let mut save = cursor.save();
+        let mut subs: Vec<Node> = vec![];
 
         while self.steps[index].rules().iter().any(|(rule, i)| {
-            if rule.parse(lang, cursor) {
+            if let Some(node) = rule.parse(lang, cursor) {
+                subs.push(node);
                 index = i.clone();
                 return true;
             }
@@ -115,9 +134,18 @@ impl Token {
 
         if !success {
             cursor.restore(save);
+            return None;
         }
 
-        return success
+        if success {
+            return Some(Node::<'a> {
+                span: cursor.get_span(&mut save),
+                kind: &self,
+                subs,
+            });
+        } else {
+            return None
+        } 
     }
 }
 
