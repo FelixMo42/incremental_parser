@@ -98,13 +98,36 @@ fn out(screen: &mut Screen, symbols: &Vec<Node>, src: &str) {
     }
 }
 
+fn print_tree(node: &Node, tab: usize) {
+    println!("{}{}, {}", " ".repeat(tab), node.span.0, node.span.1);
+    for child in &node.subs {
+        print_tree(&child, tab + 2);
+    }
+}
+
 fn main() {
     let tokens = toks();
     let mut doc = Document::new(&tokens);
 
+    let src = "let x = 5".to_string();
+    doc.parse(src.as_str(), Edit {
+        span: (0, 0),
+        len: src.len()
+    });
+    println!("====");
+    print_tree(&doc.node, 0);
+
+    let src = "let x1 = 5".to_string();
+    doc.parse(src.as_str(), Edit {
+        span: (5, 5),
+        len: 1
+    });
+    println!("====");
+    print_tree(&doc.node, 0);
+
+    /*
     let mut screen = Screen::new();
 
-    let mut src = "".to_string();
 
     let mut index = 0;
 
@@ -120,7 +143,7 @@ fn main() {
 
                 index += 1;
                 
-                out(&mut screen, &doc.nodes, &src);
+                out(&mut screen, &doc.node.subs, &src);
             }
             Event::Key(Key::Left) => {
                 if index != 0 {
@@ -145,7 +168,7 @@ fn main() {
 
                     index -= 1;
 
-                    out(&mut screen, &doc.nodes, &src);
+                    out(&mut screen, &doc.node.subs, &src);
                 }
             }
             _ => break
@@ -153,5 +176,6 @@ fn main() {
 
         screen.blit();
     }
+    */
 }
 
