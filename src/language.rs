@@ -1,8 +1,7 @@
-use std::{iter::Peekable, ops::RangeInclusive, str::CharIndices};
+use std::{iter::Peekable, ops::{Deref, RangeInclusive}, rc::Rc, str::CharIndices};
 use tblit::screen::Color;
 
-use crate::document::Document;
-
+use crate::document::{Document, Edit};
 
 /* Rule */
 
@@ -78,7 +77,7 @@ impl<'a, 'b> Cursor<'a, 'b> {
     }
 
     pub fn skip(&mut self, node: &Node) {
-        while let Some(_) = self.chars.next_if(|(i, _)| i < &node.span.1) {}
+        while self.chars.next_if(|(i, _)| i < &node.span.1).is_some() {}
     }
 } 
 
@@ -88,59 +87,68 @@ impl<'a, 'b> Cursor<'a, 'b> {
 pub struct Node<'a> {
     pub span: (usize, usize),
     pub kind: &'a Token,
-    pub subs: Vec<Node<'a>>
+    pub subs: Vec<Rc<Node<'a>>>
 }
 
-impl<'a> Node<'a> {
-    pub fn parse(&mut self, cursor: &mut Cursor<'a, '_>) -> bool {
-        let mut subs = vec![];
-        let mut save = cursor.save();
-        let mut step = 0;
-        let mut index = 0;
+pub fn parse<'a>(
+    kind: &'a Token,
+    cursor: &mut Cursor<'a, '_>,
+    edit: &Edit,
+    node: &Rc<Node<'a>>
+) -> Option<Rc<Node<'a>>> {
+    let mut subs = vec![];
+    let mut save = cursor.save();
+    let mut step = 0;
 
-        while self.kind.steps[step].rules().iter().any(|(rule, i)| {
-            let success = match rule {
-                Rule::Char(range) => {
-                    cursor.chars.next_if(|(_, chr)| range.contains(chr)).is_some()
-                },
-                Rule::Token(token_id) => {
-                    let token = &cursor.lang[*token_id];
+    let mut children = node.subs.iter().peekable();
 
-                    let mut node = Node {
-                        span: (0, 0),
-                        kind: token,
-                        subs: vec![]
-                    };
+    while kind.steps[step].rules().iter().any(|(rule, i)| {
+        let success = match rule {
+            Rule::Char(range) => {
+                cursor.chars.next_if(|(_, chr)| range.contains(chr)).is_some()
+            },
+            Rule::Token(token_id) => {
+                let token = &cursor.lang[*token_id];
 
-                    if node.parse(cursor) {
-                        subs.push(node);
-                        true
-                    } else {
-                        false
-                    }
+                println!("\x1b[38;2;{};{};{}mparsing at: i={}, s={} t={}\x1b[m",
+                    kind.color.0,
+                    kind.color.1,
+                    kind.color.2,
+                    cursor.get_index(), step, token_id);
+
+                while children.peek().is_some() && children.peek().unwrap().span.0 < cursor.get_index() {
+                    println!("skiping ({}, {}) @ {}", node.span.0, node.span.1, cursor.get_index());
+                    children.next();
                 }
-            };
 
-            if success {
-                step = *i;
+                if let Some(node) = parse(token, cursor, edit, node) {
+                    subs.push(node);
+                    true
+                } else {
+                    false
+                }
             }
-
-            return success;
-        }) {}
-
-        let success =
-            self.kind.steps[step].is_final() &&
-            cursor.advanced_from(&mut save);
+        };
 
         if success {
-            self.span = cursor.get_span(&mut save);
-            self.kind = self.kind;
-            self.subs = subs;
-        } else {
-            cursor.restore(save);
+            step = *i;
         }
 
         return success;
+    }) {}
+
+    let success =
+        kind.steps[step].is_final() &&
+        cursor.advanced_from(&mut save);
+
+    if success {
+        return Some(Rc::new(Node::<'a> {
+            span: cursor.get_span(&mut save),
+            kind, subs
+        }));
+    } else {
+        cursor.restore(save);
+        return None;
     }
 }
 
@@ -152,7 +160,6 @@ pub struct Token {
     pub steps: Vec<Step>
 }
 
-
 impl Token {
     pub fn new(color: Color, steps: Vec<Step>) -> Token {
         return Token {
@@ -161,4 +168,3 @@ impl Token {
         }
     }
 }
-

@@ -1,5 +1,9 @@
+#![feature(get_mut_unchecked)]
+
 pub mod language;
 pub mod document;
+
+use std::rc::Rc;
 
 use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
@@ -18,7 +22,7 @@ fn toks() -> Vec<Token> {
 
     let name = Token::new(Color(249, 245, 235), vec![
         Step(vec![
-             (Rule::Token(6), 0)
+             (Rule::Token(7), 0)
         ], true),
         Step(vec![
              (Rule::Token(1), 1)
@@ -27,9 +31,17 @@ fn toks() -> Vec<Token> {
 
     let word = Token::new(Color(10, 245, 0), vec![
         Step(vec![
+            (Rule::Char('a'..='z'), 1),
+            (Rule::Char('A'..='Z'), 1),
+            (Rule::Char('_'..='_'), 1),
+            (Rule::Char('\''..='\''), 1),
+        ], true),
+
+        Step(vec![
             (Rule::Char('a'..='z'), 0),
             (Rule::Char('A'..='Z'), 0),
             (Rule::Char('_'..='_'), 0),
+            (Rule::Char('0'..='9'), 0),
             (Rule::Char('\''..='\''), 0),
         ], true),
     ]);
@@ -65,14 +77,14 @@ fn toks() -> Vec<Token> {
         ], true)
     ]);
 
-    let file = Token::new(Color(255, 255, 255), vec![
+    let file = Token::new(Color(255, 255, 0), vec![
         Step(vec![
             (Rule::Token(1), 0),
             (Rule::Token(2), 0),
             (Rule::Token(3), 0),
             (Rule::Token(4), 0),
             (Rule::Token(5), 0),
-            (Rule::Token(7), 0),
+            (Rule::Token(6), 0),
         ], true)
     ]);
 
@@ -80,55 +92,63 @@ fn toks() -> Vec<Token> {
         file,        // 0
         whitespace,  // 1
         const_let,   // 2
-        number,      // 3
-        punctuation, // 4
-        name,        // 5
-        word,        // 6
-        error,       // 7
+        name,        // 3
+        number,      // 4
+        punctuation, // 5
+        error,       // 6
+
+        word,        // 7
     ];
 }
 
-fn out(screen: &mut Screen, symbols: &Vec<Node>, src: &str) {
+fn out(screen: &mut Screen, nodes: &Vec<Rc<Node>>, src: &str) {
     let mut chars = src.chars();
 
-    for symbol in symbols.iter() {
-        for x in symbol.span.0..symbol.span.1 {
-            screen.set(chars.next().unwrap(), symbol.kind.color, &Vec2::new(x, 0));
+    for node in nodes.iter() {
+        for x in node.span.0..node.span.1 {
+            screen.set(chars.next().unwrap(), node.kind.color, &Vec2::new(x, 0));
         }
     }
 }
 
 fn print_tree(node: &Node, tab: usize) {
-    println!("{}{}, {}", " ".repeat(tab), node.span.0, node.span.1);
+    println!("{}\x1b[38;2;{};{};{}m{}, {}\x1b[m",
+        " ".repeat(tab),
+        node.kind.color.0,
+        node.kind.color.1,
+        node.kind.color.2,
+        node.span.0, node.span.1);
     for child in &node.subs {
-        print_tree(&child, tab + 2);
+        print_tree(child, tab + 2);
     }
 }
 
 fn main() {
+    let mut src = "".to_string();
     let tokens = toks();
     let mut doc = Document::new(&tokens);
 
-    let src = "let x = 5".to_string();
-    doc.parse(src.as_str(), Edit {
-        span: (0, 0),
-        len: src.len()
-    });
-    println!("====");
-    print_tree(&doc.node, 0);
+    let debug = true;
+    if debug {
+        println!("====");
+        let src = "let x = 5".to_string();
+        doc.parse(src.as_str(), Edit {
+            span: (0, 0),
+            len: src.len()
+        });
+        print_tree(&doc.root, 0);
 
-    let src = "let x1 = 5".to_string();
-    doc.parse(src.as_str(), Edit {
-        span: (5, 5),
-        len: 1
-    });
-    println!("====");
-    print_tree(&doc.node, 0);
+        println!("====");
+        let src = "let x1 = 5".to_string();
+        doc.parse(src.as_str(), Edit {
+            span: (5, 5),
+            len: 1
+        });
+        print_tree(&doc.root, 0);
+        return
+    }
 
-    /*
     let mut screen = Screen::new();
-
-
     let mut index = 0;
 
     for event in screen.events() {
@@ -143,7 +163,7 @@ fn main() {
 
                 index += 1;
                 
-                out(&mut screen, &doc.node.subs, &src);
+                out(&mut screen, &doc.root.subs, &src);
             }
             Event::Key(Key::Left) => {
                 if index != 0 {
@@ -168,7 +188,7 @@ fn main() {
 
                     index -= 1;
 
-                    out(&mut screen, &doc.node.subs, &src);
+                    out(&mut screen, &doc.root.subs, &src);
                 }
             }
             _ => break
@@ -176,6 +196,5 @@ fn main() {
 
         screen.blit();
     }
-    */
 }
 

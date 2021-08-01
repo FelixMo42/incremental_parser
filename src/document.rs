@@ -1,4 +1,6 @@
-use crate::language::{Cursor, Language, Node};
+use std::rc::Rc;
+
+use crate::language::{Cursor, Language, Node, parse};
 
 pub type Span = (usize, usize);
 
@@ -9,10 +11,12 @@ pub struct Edit {
 
 pub struct Document<'a> {
     pub lang: &'a Language,
-    pub node: Node<'a>
+    pub root: Rc<Node<'a>>
 }
 
-fn incrament_node(node: &mut Node, removed: usize, added: usize, start: usize) {
+fn incrament_node(node: &mut Rc<Node>, removed: usize, added: usize, start: usize) {
+    let node = unsafe { Rc::get_mut_unchecked(node) };
+
     if node.span.0 >= start {
         if node.span.0 > added {
             node.span.0 = node.span.0 - removed + added;
@@ -31,30 +35,27 @@ impl<'a> Document<'a> {
     pub fn new(language: &'a Language) -> Document<'a> {
         return Document {
             lang: language,
-            node: Node {
+            root: Rc::new(Node {
                 span: (0, 0),
                 kind: &language[0],
                 subs: vec! []
-            }
+            })
         };
     }
 }
 
 impl<'a> Document<'a> {
     pub fn parse(&mut self, src: &str, edit: Edit) {
-        // What is the index of the first node that could have been edited.
-
         // How much was removed? 
         let removed = edit.span.1 - edit.span.0;
 
-        incrament_node(&mut self.node, removed, edit.len, edit.span.0);
+        incrament_node(&mut self.root, removed, edit.len, edit.span.0);
 
         if src.len() == 0 {
             return
         }
 
         let mut cursor = Cursor::new(self, src);
-        self.node.parse(&mut cursor);
+        self.root = parse(&self.lang[0], &mut cursor, &edit, &self.root).unwrap();
     }
 }
-
