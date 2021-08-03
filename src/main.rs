@@ -1,5 +1,3 @@
-#![feature(get_mut_unchecked)]
-
 pub mod language;
 pub mod document;
 
@@ -128,7 +126,7 @@ fn main() {
     let tokens = toks();
     let mut doc = Document::new(&tokens);
 
-    let debug = true;
+    let debug = false;
     if debug {
         println!("====");
         let src = "let x = 5".to_string();

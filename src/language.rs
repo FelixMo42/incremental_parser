@@ -1,4 +1,4 @@
-use std::{iter::Peekable, ops::{Deref, RangeInclusive}, rc::Rc, str::CharIndices};
+use std::{iter::Peekable, ops::RangeInclusive, rc::Rc, str::CharIndices};
 use tblit::screen::Color;
 
 use crate::document::{Document, Edit};
@@ -36,19 +36,56 @@ type CursorIter<'a> = Peekable<CharIndices<'a>>;
 
 pub struct Cursor<'a, 'b> {
     pub src: &'b str,
+    pub chars: CursorIter<'b>,
+
     pub lang: &'a Language,
-    pub chars: CursorIter<'b> 
+
+    pub edit: Edit,
+    pub node: Rc<Node<'a>>,
+    pub sub: usize,
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn new(doc: &Document<'a>, src: &'b str) -> Cursor<'a, 'b> {
+    pub fn new(doc: &Document<'a>, edit: Edit, src: &'b str) -> Cursor<'a, 'b> {
         return Cursor {
             src,
             lang: doc.lang,
+            node: doc.root.clone(),
+            edit,
+            sub: 0,
             chars: src.char_indices().peekable()
         };
     }
+}
 
+impl<'a, 'b> Cursor<'a, 'b> {
+    pub fn get_node(&mut self, token: &'a Token, index: usize) -> Option<Rc<Node<'a>>> {
+        while self.sub < self.node.subs.len() {
+            let child = &self.node.subs[self.sub];
+
+            if child.span.0 == index && child.kind == token {
+                if child.span.1 < self.edit.span.0 || child.span.0 > self.edit.span.0 + self.edit.len {
+                    return Some(child.clone());
+                }
+            }
+
+            if self.node.subs[self.sub].span.0 >= index {
+                break
+            }
+
+            self.sub += 1;
+        }
+
+        return None;
+    }
+
+    pub fn set_node(&mut self, node: Rc<Node<'a>>) {
+        self.node = node;
+        self.sub = 0;
+    }
+}
+
+impl<'a, 'b> Cursor<'a, 'b> {
     pub fn done(&mut self) -> bool {
         return self.chars.peek().is_none();
     }
@@ -90,17 +127,10 @@ pub struct Node<'a> {
     pub subs: Vec<Rc<Node<'a>>>
 }
 
-pub fn parse<'a>(
-    kind: &'a Token,
-    cursor: &mut Cursor<'a, '_>,
-    edit: &Edit,
-    node: &Rc<Node<'a>>
-) -> Option<Rc<Node<'a>>> {
+pub fn parse<'a>(kind: &'a Token, cursor: &mut Cursor<'a, '_>) -> Option<Rc<Node<'a>>> {
     let mut subs = vec![];
     let mut save = cursor.save();
     let mut step = 0;
-
-    let mut children = node.subs.iter().peekable();
 
     while kind.steps[step].rules().iter().any(|(rule, i)| {
         let success = match rule {
@@ -110,18 +140,12 @@ pub fn parse<'a>(
             Rule::Token(token_id) => {
                 let token = &cursor.lang[*token_id];
 
-                println!("\x1b[38;2;{};{};{}mparsing at: i={}, s={} t={}\x1b[m",
-                    kind.color.0,
-                    kind.color.1,
-                    kind.color.2,
-                    cursor.get_index(), step, token_id);
-
-                while children.peek().is_some() && children.peek().unwrap().span.0 < cursor.get_index() {
-                    println!("skiping ({}, {}) @ {}", node.span.0, node.span.1, cursor.get_index());
-                    children.next();
-                }
-
-                if let Some(node) = parse(token, cursor, edit, node) {
+                let index = cursor.get_index();
+                if let Some(node) = cursor.get_node(token, index) {
+                    cursor.skip(&node);
+                    subs.push(node);
+                    true
+                } else if let Some(node) = parse(token, cursor) {
                     subs.push(node);
                     true
                 } else {

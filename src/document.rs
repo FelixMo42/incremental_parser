@@ -15,19 +15,19 @@ pub struct Document<'a> {
 }
 
 fn incrament_node(node: &mut Rc<Node>, removed: usize, added: usize, start: usize) {
-    let node = unsafe { Rc::get_mut_unchecked(node) };
+    let node = Rc::get_mut(node).expect("extra copy of node exists!");
 
     if node.span.0 >= start {
-        if node.span.0 > added {
+        if node.span.0 > start {
             node.span.0 = node.span.0 - removed + added;
             node.span.1 = node.span.1 - removed + added;
         } else {
             node.span.1 = node.span.1 - removed + added;
         }
+    }
 
-        for child in &mut node.subs {
-            incrament_node(child, removed, added, start);
-        }
+    for child in &mut node.subs {
+        incrament_node(child, removed, added, start);
     }
 }
 
@@ -55,7 +55,7 @@ impl<'a> Document<'a> {
             return
         }
 
-        let mut cursor = Cursor::new(self, src);
-        self.root = parse(&self.lang[0], &mut cursor, &edit, &self.root).unwrap();
+        let mut cursor = Cursor::new(self, edit, src);
+        self.root = parse(&self.lang[0], &mut cursor).unwrap();
     }
 }
