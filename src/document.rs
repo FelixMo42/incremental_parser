@@ -4,6 +4,21 @@ use crate::language::{Cursor, Language, Node, parse};
 
 pub type Span = (usize, usize);
 
+pub trait Rule<'a>: PartialEq {
+    fn parse(&self, cursor: &mut Cursor<'a, '_>) -> Rc<Node<'a>>;
+}
+
+#[derive(PartialEq)]
+struct Parens {
+    innter: String
+}
+
+impl<'a> Rule<'a> for Parens {
+    fn parse(&self, cursor: &mut Cursor<'a, '_>) -> Rc<Node<'a>> {
+        return cursor.node.clone();
+    }
+}
+
 pub struct Edit {
     pub span: Span,
     pub len: usize
@@ -37,7 +52,7 @@ impl<'a> Document<'a> {
             lang: language,
             root: Rc::new(Node {
                 span: (0, 0),
-                kind: &language[0],
+                rule: &language[0],
                 subs: vec! []
             })
         };
@@ -56,6 +71,6 @@ impl<'a> Document<'a> {
         }
 
         let mut cursor = Cursor::new(self, edit, src);
-        self.root = parse(&self.lang[0], &mut cursor).unwrap();
+        self.root = cursor.parse(&self.lang[0]).unwrap();
     }
 }

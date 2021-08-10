@@ -1,36 +1,38 @@
-use std::{iter::Peekable, ops::RangeInclusive, rc::Rc, str::CharIndices};
+use std::{iter::Peekable, rc::Rc, str::CharIndices};
+
 use tblit::screen::Color;
 
 use crate::document::{Document, Edit};
 
 /* Rule */
 
-#[derive(PartialEq, Eq)]
-pub enum Rule {
-    Char(RangeInclusive<char>),
-    Token(usize)
+pub trait Rule {
+    fn parse<'a>(&self, cursor: &mut Cursor<'a, '_>) -> Option<Vec<Rc<Node<'a>>>>;
 }
 
-/* Step */
+impl PartialEq for dyn Rule {
+    fn eq(&self, outher: &dyn Rule) -> bool {
+        // get the raw pointers
+        let a = self as *const _;
+        let b = outher as *const _;
 
-#[derive(PartialEq, Eq)]
-pub struct Step (pub Vec<(Rule, usize)>, pub bool);
-
-impl Step {
-    #[inline]
-    pub fn rules(&self) -> &Vec<(Rule, usize)> {
-        return &self.0;
-    }
-
-    #[inline]
-    pub fn is_final(&self) -> bool {
-        return self.1;
+        // see if the two point at the same thing
+        return a == b;
     }
 }
+
+/* Node */
+
+pub struct Node<'a> {
+    pub span: (usize, usize),
+    pub rule: &'a Box<dyn Rule>,
+    pub subs: Vec<Rc<Node<'a>>>
+}
+
 
 /* Cursor */
 
-pub type Language = Vec<Token>;
+pub type Language = Vec<Box<dyn Rule>>;
 
 type CursorIter<'a> = Peekable<CharIndices<'a>>;
 
@@ -59,11 +61,11 @@ impl<'a, 'b> Cursor<'a, 'b> {
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn get_node(&mut self, token: &'a Token, index: usize) -> Option<Rc<Node<'a>>> {
+    pub fn get_node(&self, rule: &'a Box<dyn Rule>, index: usize) -> Option<Rc<Node<'a>>> {
         while self.sub < self.node.subs.len() {
             let child = &self.node.subs[self.sub];
 
-            if child.span.0 == index && child.kind == token {
+            if child.span.0 == index && child.rule == rule {
                 if child.span.1 < self.edit.span.0 || child.span.0 > self.edit.span.0 + self.edit.len {
                     return Some(child.clone());
                 }
@@ -113,82 +115,94 @@ impl<'a, 'b> Cursor<'a, 'b> {
         self.chars.peek().map(|(i, _)| i.clone()).unwrap_or(self.src.len())
     }
 
-    pub fn skip(&mut self, node: &Node) {
+    pub fn skip(&mut self, node: &Rc<Node>) {
         while self.chars.next_if(|(i, _)| i < &node.span.1).is_some() {}
     }
 } 
 
-/* Node */
+impl<'a> Cursor<'a, '_> {
+    pub fn parse(&mut self, rule: &'a Box<dyn Rule>) -> Option<Rc<Node<'a>>> {
+        let index = self.get_index();
 
-#[derive(PartialEq, Eq)]
-pub struct Node<'a> {
-    pub span: (usize, usize),
-    pub kind: &'a Token,
-    pub subs: Vec<Rc<Node<'a>>>
-}
+        // Check to see if we have this one memorized.
+        if let Some(node) = self.get_node(rule, index) {
+            // If we do have one, then skip the cursor past it.
+            self.skip(&node);
 
-pub fn parse<'a>(kind: &'a Token, cursor: &mut Cursor<'a, '_>) -> Option<Rc<Node<'a>>> {
-    let mut subs = vec![];
-    let mut save = cursor.save();
-    let mut step = 0;
-
-    while kind.steps[step].rules().iter().any(|(rule, i)| {
-        let success = match rule {
-            Rule::Char(range) => {
-                cursor.chars.next_if(|(_, chr)| range.contains(chr)).is_some()
-            },
-            Rule::Token(token_id) => {
-                let token = &cursor.lang[*token_id];
-
-                let index = cursor.get_index();
-                if let Some(node) = cursor.get_node(token, index) {
-                    cursor.skip(&node);
-                    subs.push(node);
-                    true
-                } else if let Some(node) = parse(token, cursor) {
-                    subs.push(node);
-                    true
-                } else {
-                    false
-                }
-            }
-        };
-
-        if success {
-            step = *i;
+            // Then return the old node.
+            return Some(node);
         }
 
-        return success;
-    }) {}
+        let save = self.save();
 
-    let success =
-        kind.steps[step].is_final() &&
-        cursor.advanced_from(&mut save);
+        if let Some(subs) = rule.parse(self) {
+            return Some(Rc::new(Node {
+                span: self.get_span(&mut save),
+                subs,
+                rule,
+            }));
+        }
 
-    if success {
-        return Some(Rc::new(Node::<'a> {
-            span: cursor.get_span(&mut save),
-            kind, subs
-        }));
-    } else {
-        cursor.restore(save);
+        self.restore(save);
+        
         return None;
     }
 }
 
+/* Step */
+
+pub struct Step (pub Vec<(Box<dyn Rule>, usize)>, pub bool);
+
+impl Step {
+    #[inline]
+    pub fn rules(&self) -> &Vec<(Box<dyn Rule>, usize)> {
+        return &self.0;
+    }
+
+    #[inline]
+    pub fn is_final(&self) -> bool {
+        return self.1;
+    }
+}
+
+
 /* Token */
 
-#[derive(PartialEq, Eq)]
 pub struct Token {
-    pub color: Color,
-    pub steps: Vec<Step>
+    steps: Vec<Step>
 }
 
 impl Token {
-    pub fn new(color: Color, steps: Vec<Step>) -> Token {
+    pub fn new(color: Option<Color>, steps: Vec<Step>) -> Token {
         return Token {
-            color,
             steps
+        };
+    }
+}
+
+impl Rule for Token {
+    fn parse<'a>(&self, cursor: &mut Cursor<'a, '_>) -> Option<Vec<Rc<Node<'a>>>> {
+        let mut subs = vec![];
+        let mut step = 0;
+
+        while self.steps[step].rules().iter().any(|(rule, i)| {
+            if let Some(node) = rule.parse(cursor) {
+                subs.push(node);
+
+                step = *i;
+
+                true
+            } else {
+                false
+            }
+        }) {}
+
+        let success = self.steps[step].is_final();
+
+        if success {
+            return Some(subs);
+        } else {
+            return None;
         }
     }
 }
