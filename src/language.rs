@@ -8,6 +8,8 @@ use crate::document::{Document, Edit};
 
 pub trait Rule {
     fn parse<'a>(&self, cursor: &mut Cursor<'a, '_>) -> Option<Vec<Rc<Node<'a>>>>;
+
+    fn get_color(&self) -> Option<Color>;
 }
 
 impl PartialEq for dyn Rule {
@@ -44,7 +46,6 @@ pub struct Cursor<'a, 'b> {
 
     pub edit: Edit,
     pub node: Rc<Node<'a>>,
-    pub sub: usize,
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
@@ -54,7 +55,6 @@ impl<'a, 'b> Cursor<'a, 'b> {
             lang: doc.lang,
             node: doc.root.clone(),
             edit,
-            sub: 0,
             chars: src.char_indices().peekable()
         };
     }
@@ -62,7 +62,7 @@ impl<'a, 'b> Cursor<'a, 'b> {
 
 impl<'a, 'b> Cursor<'a, 'b> {
     pub fn get_node(&self, rule: &'a Box<dyn Rule>, index: usize) -> Option<Rc<Node<'a>>> {
-        while self.sub < self.node.subs.len() {
+        /* while self.sub < self.node.subs.len() {
             let child = &self.node.subs[self.sub];
 
             if child.span.0 == index && child.rule == rule {
@@ -76,22 +76,13 @@ impl<'a, 'b> Cursor<'a, 'b> {
             }
 
             self.sub += 1;
-        }
+        } */
 
         return None;
-    }
-
-    pub fn set_node(&mut self, node: Rc<Node<'a>>) {
-        self.node = node;
-        self.sub = 0;
     }
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn done(&mut self) -> bool {
-        return self.chars.peek().is_none();
-    }
-
     pub fn save(&self) -> CursorIter<'b> {
         return self.chars.clone();
     }
@@ -121,7 +112,11 @@ impl<'a, 'b> Cursor<'a, 'b> {
 } 
 
 impl<'a> Cursor<'a, '_> {
-    pub fn parse(&mut self, rule: &'a Box<dyn Rule>) -> Option<Rc<Node<'a>>> {
+    pub fn parse(&mut self, rule_index: &usize) -> Option<Rc<Node<'a>>> {
+        // Get the rule
+        let rule = &self.lang[*rule_index];
+
+        // Get the current index
         let index = self.get_index();
 
         // Check to see if we have this one memorized.
@@ -130,12 +125,18 @@ impl<'a> Cursor<'a, '_> {
             self.skip(&node);
 
             // Then return the old node.
-            return Some(node);
+            return Some(node.clone());
         }
 
-        let save = self.save();
+        let mut save = self.save();
 
         if let Some(subs) = rule.parse(self) {
+            //
+            if !self.advanced_from(&mut save) {
+                return None;
+            }
+
+            //
             return Some(Rc::new(Node {
                 span: self.get_span(&mut save),
                 subs,
@@ -151,11 +152,11 @@ impl<'a> Cursor<'a, '_> {
 
 /* Step */
 
-pub struct Step (pub Vec<(Box<dyn Rule>, usize)>, pub bool);
+pub struct Step<T> (pub Vec<(T, usize)>, pub bool);
 
-impl Step {
+impl<T> Step<T> {
     #[inline]
-    pub fn rules(&self) -> &Vec<(Box<dyn Rule>, usize)> {
+    pub fn rules(&self) -> &Vec<(T, usize)> {
         return &self.0;
     }
 
@@ -169,14 +170,16 @@ impl Step {
 /* Token */
 
 pub struct Token {
-    steps: Vec<Step>
+    color: Option<Color>,
+    steps: Vec<Step<usize>>
 }
 
 impl Token {
-    pub fn new(color: Option<Color>, steps: Vec<Step>) -> Token {
-        return Token {
+    pub fn new(color: Option<Color>, steps: Vec<Step<usize>>) -> Box<dyn Rule> {
+        return Box::new(Token {
+            color,
             steps
-        };
+        });
     }
 }
 
@@ -186,7 +189,7 @@ impl Rule for Token {
         let mut step = 0;
 
         while self.steps[step].rules().iter().any(|(rule, i)| {
-            if let Some(node) = rule.parse(cursor) {
+            if let Some(node) = cursor.parse(rule) {
                 subs.push(node);
 
                 step = *i;
@@ -204,5 +207,9 @@ impl Rule for Token {
         } else {
             return None;
         }
+    }
+
+    fn get_color(&self) -> Option<Color> {
+        return self.color.clone();
     }
 }

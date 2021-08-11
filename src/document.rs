@@ -1,22 +1,12 @@
 use std::rc::Rc;
 
-use crate::language::{Cursor, Language, Node, parse};
+use crate::language::{Cursor, Language, Node};
 
 pub type Span = (usize, usize);
-
-pub trait Rule<'a>: PartialEq {
-    fn parse(&self, cursor: &mut Cursor<'a, '_>) -> Rc<Node<'a>>;
-}
 
 #[derive(PartialEq)]
 struct Parens {
     innter: String
-}
-
-impl<'a> Rule<'a> for Parens {
-    fn parse(&self, cursor: &mut Cursor<'a, '_>) -> Rc<Node<'a>> {
-        return cursor.node.clone();
-    }
 }
 
 pub struct Edit {
@@ -71,6 +61,6 @@ impl<'a> Document<'a> {
         }
 
         let mut cursor = Cursor::new(self, edit, src);
-        self.root = cursor.parse(&self.lang[0]).unwrap();
+        self.root = cursor.parse(&0).unwrap();
     }
 }
