@@ -1,7 +1,6 @@
-use std::{iter::Peekable, rc::Rc, str::CharIndices};
-use log::{info};
-use tblit::screen::Color;
 use crate::document::{Document, Edit, NodeIter};
+use std::{iter::Peekable, rc::Rc, str::CharIndices};
+use tblit::screen::Color;
 
 /* Rule */
 
@@ -27,9 +26,8 @@ impl PartialEq for dyn Rule {
 pub struct Node<'a> {
     pub span: (usize, usize),
     pub rule: &'a Box<dyn Rule>,
-    pub subs: Vec<Rc<Node<'a>>>
+    pub subs: Vec<Rc<Node<'a>>>,
 }
-
 
 /* Cursor */
 
@@ -54,7 +52,7 @@ impl<'a, 'b> Cursor<'a, 'b> {
             edit,
             lang: doc.lang,
             node: doc.node_iter(),
-            chars: src.char_indices().peekable()
+            chars: src.char_indices().peekable(),
         };
     }
 }
@@ -68,14 +66,15 @@ impl<'a, 'b> Cursor<'a, 'b> {
             }
 
             let right_index = node.span.0 == index;
-            let right_rule  = node.rule == rule;
-            let unedited    = self.edit.span.1 < node.span.0 || self.edit.span.0 > node.span.1;
+            let right_rule = node.rule == rule;
+            let unedited =
+                self.edit.span.1 + self.edit.len < node.span.0 || self.edit.span.0 > node.span.1;
 
             return if right_index && right_rule && unedited {
                 Some(node.clone())
             } else {
                 None
-            }
+            };
         }
 
         return None;
@@ -96,20 +95,20 @@ impl<'a, 'b> Cursor<'a, 'b> {
     }
 
     pub fn get_span(&mut self, save: &mut CursorIter<'b>) -> (usize, usize) {
-        return (
-            save.peek().unwrap().0,
-            self.get_index()
-        )
+        return (save.peek().unwrap().0, self.get_index());
     }
 
     pub fn get_index(&mut self) -> usize {
-        self.chars.peek().map(|(i, _)| i.clone()).unwrap_or(self.src.len())
+        self.chars
+            .peek()
+            .map(|(i, _)| i.clone())
+            .unwrap_or(self.src.len())
     }
 
     pub fn skip(&mut self, node: &Rc<Node>) {
         while self.chars.next_if(|(i, _)| i < &node.span.1).is_some() {}
     }
-} 
+}
 
 impl<'a> Cursor<'a, '_> {
     pub fn parse(&mut self, rule_index: &usize) -> Option<Rc<Node<'a>>> {
@@ -123,8 +122,6 @@ impl<'a> Cursor<'a, '_> {
         if let Some(node) = self.get_node(rule, index) {
             // If we do have one, then skip the cursor past it.
             self.skip(&node);
-            
-            info!("memorized");
 
             // Then return the old node.
             return Some(node.clone());
@@ -147,14 +144,14 @@ impl<'a> Cursor<'a, '_> {
         }
 
         self.restore(save);
-        
+
         return None;
     }
 }
 
 /* Step */
 
-pub struct Step<T> (pub Vec<(T, usize)>, pub bool);
+pub struct Step<T>(pub Vec<(T, usize)>, pub bool);
 
 impl<T> Step<T> {
     pub fn rules(&self) -> &Vec<(T, usize)> {
@@ -166,20 +163,16 @@ impl<T> Step<T> {
     }
 }
 
-
 /* Token */
 
 pub struct Token {
     color: Option<Color>,
-    steps: Vec<Step<usize>>
+    steps: Vec<Step<usize>>,
 }
 
 impl Token {
     pub fn new(color: Option<Color>, steps: Vec<Step<usize>>) -> Box<dyn Rule> {
-        return Box::new(Token {
-            color,
-            steps
-        });
+        return Box::new(Token { color, steps });
     }
 }
 

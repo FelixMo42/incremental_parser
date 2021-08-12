@@ -1,42 +1,37 @@
-use std::rc::Rc;
-
-use log::info;
-
 use crate::language::{Cursor, Language, Node};
+use log::info;
+use std::rc::Rc;
 
 pub type Span = (usize, usize);
 
 #[derive(PartialEq)]
 struct Parens {
-    innter: String
+    innter: String,
 }
 
 pub struct Edit {
     pub span: Span,
-    pub len: usize
+    pub len: usize,
 }
 
 pub struct Step<'a, 'b> {
     node: &'b Rc<Node<'a>>,
-    index: usize
+    index: usize,
 }
 
 pub struct NodeIter<'a, 'b> {
-    nodes: Vec<Step<'a, 'b>>
+    nodes: Vec<Step<'a, 'b>>,
 }
 
 impl<'a, 'b> Iterator for NodeIter<'a, 'b> {
     type Item = &'b Rc<Node<'a>>;
 
-
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(step) = self.nodes.last() {
             let node = &step.node.subs[step.index.clone()];
-           
+
             if step.index < step.node.subs.len() && node.subs.len() > 0 {
-                self.nodes.push(Step {
-                    node, index: 0
-                })
+                self.nodes.push(Step { node, index: 0 })
             } else {
                 while let Some(step) = self.nodes.last_mut() {
                     step.index += 1;
@@ -48,7 +43,7 @@ impl<'a, 'b> Iterator for NodeIter<'a, 'b> {
                     }
                 }
             }
-            
+
             return Some(node);
         } else {
             return None;
@@ -59,31 +54,29 @@ impl<'a, 'b> Iterator for NodeIter<'a, 'b> {
 impl<'a, 'b> NodeIter<'a, 'b> {
     pub fn new(document: &'b Document<'a>) -> NodeIter<'a, 'b> {
         if document.root.subs.len() == 0 {
-            return NodeIter {
-                nodes: vec! []
-            }
+            return NodeIter { nodes: vec![] };
         }
 
         return NodeIter {
-            nodes: vec! [ Step {
+            nodes: vec![Step {
                 node: &document.root,
-                index: 0
-            } ]
+                index: 0,
+            }],
         };
     }
 
     pub fn peek(&self) -> Option<&'b Rc<Node<'a>>> {
         if let Some(step) = self.nodes.last() {
-            return Some(&step.node.subs[step.index])
+            return Some(&step.node.subs[step.index]);
         } else {
-            return None
+            return None;
         }
     }
 }
 
 pub struct Document<'a> {
     pub lang: &'a Language,
-    pub root: Rc<Node<'a>>
+    pub root: Rc<Node<'a>>,
 }
 
 fn incrament_node(node: &mut Rc<Node>, removed: usize, added: usize, start: usize) {
@@ -110,15 +103,15 @@ impl<'a> Document<'a> {
             root: Rc::new(Node {
                 span: (0, 0),
                 rule: &language[0],
-                subs: vec! []
-            })
+                subs: vec![],
+            }),
         };
     }
 }
 
 impl<'a> Document<'a> {
     pub fn parse<'b>(&'b mut self, src: &str, edit: Edit) {
-        // How much was removed? 
+        // How much was removed?
         let removed = edit.span.1 - edit.span.0;
 
         info!("parsing");
@@ -126,7 +119,7 @@ impl<'a> Document<'a> {
         incrament_node(&mut self.root, removed, edit.len, edit.span.0);
 
         if src.len() == 0 {
-            return
+            return;
         }
 
         let mut cursor = Cursor::new(self, edit, src);
