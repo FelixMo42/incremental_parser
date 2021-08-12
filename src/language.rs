@@ -1,8 +1,7 @@
 use std::{iter::Peekable, rc::Rc, str::CharIndices};
-
+use log::{info};
 use tblit::screen::Color;
-
-use crate::document::{Document, Edit};
+use crate::document::{Document, Edit, NodeIter};
 
 /* Rule */
 
@@ -45,38 +44,39 @@ pub struct Cursor<'a, 'b> {
     pub lang: &'a Language,
 
     pub edit: Edit,
-    pub node: Rc<Node<'a>>,
+    pub node: NodeIter<'a, 'b>,
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn new(doc: &Document<'a>, edit: Edit, src: &'b str) -> Cursor<'a, 'b> {
+    pub fn new(doc: &'b Document<'a>, edit: Edit, src: &'b str) -> Cursor<'a, 'b> {
         return Cursor {
             src,
-            lang: doc.lang,
-            node: doc.root.clone(),
             edit,
+            lang: doc.lang,
+            node: doc.node_iter(),
             chars: src.char_indices().peekable()
         };
     }
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn get_node(&self, rule: &'a Box<dyn Rule>, index: usize) -> Option<Rc<Node<'a>>> {
-        /* while self.sub < self.node.subs.len() {
-            let child = &self.node.subs[self.sub];
-
-            if child.span.0 == index && child.rule == rule {
-                if child.span.1 < self.edit.span.0 || child.span.0 > self.edit.span.0 + self.edit.len {
-                    return Some(child.clone());
-                }
+    pub fn get_node(&mut self, rule: &'a Box<dyn Rule>, index: usize) -> Option<Rc<Node<'a>>> {
+        while let Some(node) = self.node.peek() {
+            if node.span.0 < index {
+                self.node.next();
+                continue;
             }
 
-            if self.node.subs[self.sub].span.0 >= index {
-                break
-            }
+            let right_index = node.span.0 == index;
+            let right_rule  = node.rule == rule;
+            let unedited    = self.edit.span.1 < node.span.0 || self.edit.span.0 > node.span.1;
 
-            self.sub += 1;
-        } */
+            return if right_index && right_rule && unedited {
+                Some(node.clone())
+            } else {
+                None
+            }
+        }
 
         return None;
     }
@@ -123,6 +123,8 @@ impl<'a> Cursor<'a, '_> {
         if let Some(node) = self.get_node(rule, index) {
             // If we do have one, then skip the cursor past it.
             self.skip(&node);
+            
+            info!("memorized");
 
             // Then return the old node.
             return Some(node.clone());
@@ -155,12 +157,10 @@ impl<'a> Cursor<'a, '_> {
 pub struct Step<T> (pub Vec<(T, usize)>, pub bool);
 
 impl<T> Step<T> {
-    #[inline]
     pub fn rules(&self) -> &Vec<(T, usize)> {
         return &self.0;
     }
 
-    #[inline]
     pub fn is_final(&self) -> bool {
         return self.1;
     }

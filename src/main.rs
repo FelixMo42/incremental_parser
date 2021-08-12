@@ -1,6 +1,12 @@
 pub mod language;
 pub mod document;
 
+use crate::language::{Node, Rule, Step, Token};
+use crate::document::{Document, Edit};
+
+use simplelog::{Config, WriteLogger};
+
+use std::fs::File;
 use std::ops::RangeInclusive;
 use std::rc::Rc;
 use std::str::Chars;
@@ -8,9 +14,6 @@ use std::str::Chars;
 use tblit::event::{Event, Key};
 use tblit::screen::{Screen, Color};
 use tblit::vec2::Vec2;
-
-use crate::language::{Node, Rule, Step, Token};
-use crate::document::{Document, Edit};
 
 //
 
@@ -140,6 +143,12 @@ fn out(screen: &mut Screen, node: &Rc<Node>, chars: &mut Chars, cord: &mut Vec2<
 }
 
 fn main() {
+    WriteLogger::init(
+        log::LevelFilter::Info,
+        Config::default(),
+        File::create("lang.log").unwrap()
+    ).unwrap();
+
     let mut src = "".to_string();
     let language = make_language();
     let mut doc = Document::new(&language);
