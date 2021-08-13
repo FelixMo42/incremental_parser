@@ -1,4 +1,4 @@
-use crate::document::{Document, Edit, NodeIter};
+use crate::document::{Document, Edit, NodeIter, Span};
 use std::{iter::Peekable, rc::Rc, str::CharIndices};
 use tblit::screen::Color;
 
@@ -36,29 +36,29 @@ pub type Language = Vec<Box<dyn Rule>>;
 type CursorIter<'a> = Peekable<CharIndices<'a>>;
 
 pub struct Cursor<'a, 'b> {
-    pub src: &'b str,
     pub chars: CursorIter<'b>,
 
+    pub text: &'b String,
     pub lang: &'a Language,
 
-    pub edit: Edit,
+    pub edit: Span,
     pub node: NodeIter<'a, 'b>,
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn new(doc: &'b Document<'a>, edit: Edit, src: &'b str) -> Cursor<'a, 'b> {
+    pub fn new(doc: &'b Document<'a>, edit: Span) -> Cursor<'a, 'b> {
         return Cursor {
-            src,
             edit,
+            text: &doc.text,
             lang: doc.lang,
             node: doc.node_iter(),
-            chars: src.char_indices().peekable(),
+            chars: doc.text.char_indices().peekable(),
         };
     }
 }
 
 impl<'a, 'b> Cursor<'a, 'b> {
-    pub fn get_node(&mut self, rule: &'a Box<dyn Rule>, index: usize) -> Option<Rc<Node<'a>>> {
+    fn get_node(&mut self, rule: &'a Box<dyn Rule>, index: usize) -> Option<Rc<Node<'a>>> {
         while let Some(node) = self.node.peek() {
             if node.span.0 < index {
                 self.node.next();
@@ -67,8 +67,7 @@ impl<'a, 'b> Cursor<'a, 'b> {
 
             let right_index = node.span.0 == index;
             let right_rule = node.rule == rule;
-            let unedited =
-                self.edit.span.1 + self.edit.len < node.span.0 || self.edit.span.0 > node.span.1;
+            let unedited = self.edit.1 < node.span.0 || self.edit.0 > node.span.1;
 
             return if right_index && right_rule && unedited {
                 Some(node.clone())
@@ -102,7 +101,7 @@ impl<'a, 'b> Cursor<'a, 'b> {
         self.chars
             .peek()
             .map(|(i, _)| i.clone())
-            .unwrap_or(self.src.len())
+            .unwrap_or(self.text.len())
     }
 
     pub fn skip(&mut self, node: &Rc<Node>) {
@@ -130,12 +129,12 @@ impl<'a> Cursor<'a, '_> {
         let mut save = self.save();
 
         if let Some(subs) = rule.parse(self) {
-            //
+            // 
             if !self.advanced_from(&mut save) {
                 return None;
             }
 
-            //
+            // 
             return Some(Rc::new(Node {
                 span: self.get_span(&mut save),
                 subs,

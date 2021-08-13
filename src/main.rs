@@ -102,6 +102,7 @@ fn make_language() -> Vec<Box<dyn Rule>> {
     return vec![
         // Root rule
         file,        // 0
+
         // Lexer bits
         whitespace,  // 1
         punctuation, // 2
@@ -139,7 +140,6 @@ fn main() {
     )
     .unwrap();
 
-    let mut src = "".to_string();
     let language = make_language();
     let mut doc = Document::new(&language);
 
@@ -148,25 +148,14 @@ fn main() {
 
     for event in screen.events() {
         match event.unwrap() {
+            Event::Key(Key::Char('\t')) => {
+                doc.edit((index, index), "    ");
+                index += 4;
+
+            },
             Event::Key(Key::Char(chr)) => {
-                src.insert(index, chr);
-
-                doc.parse(
-                    src.as_str(),
-                    Edit {
-                        span: (index, index),
-                        len: 1,
-                    },
-                );
-
+                doc.edit((index, index), chr.to_string().as_str());
                 index += 1;
-
-                out(
-                    &mut screen,
-                    &doc.root,
-                    &mut src.chars(),
-                    &mut Vec2::new(0, 0),
-                );
             }
             Event::Key(Key::Left) => {
                 if index != 0 {
@@ -174,36 +163,28 @@ fn main() {
                 }
             }
             Event::Key(Key::Right) => {
-                if index != src.len() {
+                if index != doc.text.len() {
                     index += 1;
                 }
             }
             Event::Key(Key::Backspace) => {
                 if index != 0 {
-                    src.remove(index - 1);
+                    doc.edit((index - 1, index), "");
 
-                    doc.parse(
-                        src.as_str(),
-                        Edit {
-                            span: (index - 1, index),
-                            len: 0,
-                        },
-                    );
-
-                    screen.set(' ', Color(0, 0, 0), &Vec2::new(src.len(), 0));
+                    screen.set(' ', Color(0, 0, 0), &Vec2::new(doc.text.len(), 0));
 
                     index -= 1;
-
-                    out(
-                        &mut screen,
-                        &doc.root,
-                        &mut src.chars(),
-                        &mut Vec2::new(0, 0),
-                    );
                 }
             }
             _ => break,
         }
+
+        out(
+            &mut screen,
+            &doc.root,
+            &mut doc.text.chars(),
+            &mut Vec2::new(0, 0),
+        );
 
         screen.blit();
     }

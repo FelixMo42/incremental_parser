@@ -4,11 +4,6 @@ use std::rc::Rc;
 
 pub type Span = (usize, usize);
 
-#[derive(PartialEq)]
-struct Parens {
-    innter: String,
-}
-
 pub struct Edit {
     pub span: Span,
     pub len: usize,
@@ -76,6 +71,7 @@ impl<'a, 'b> NodeIter<'a, 'b> {
 
 pub struct Document<'a> {
     pub lang: &'a Language,
+    pub text: String,
     pub root: Rc<Node<'a>>,
 }
 
@@ -99,6 +95,7 @@ fn incrament_node(node: &mut Rc<Node>, removed: usize, added: usize, start: usiz
 impl<'a> Document<'a> {
     pub fn new(language: &'a Language) -> Document<'a> {
         return Document {
+            text: "".to_string(),
             lang: language,
             root: Rc::new(Node {
                 span: (0, 0),
@@ -110,23 +107,31 @@ impl<'a> Document<'a> {
 }
 
 impl<'a> Document<'a> {
-    pub fn parse<'b>(&'b mut self, src: &str, edit: Edit) {
+    fn parse<'b>(&'b mut self, span: Span, edit_len: usize) {
         // How much was removed?
-        let removed = edit.span.1 - edit.span.0;
+        let removed = span.1 - span.0;
 
         info!("parsing");
 
-        incrament_node(&mut self.root, removed, edit.len, edit.span.0);
+        incrament_node(&mut self.root, removed, edit_len, span.0);
 
-        if src.len() == 0 {
+        if self.text.len() == 0 {
             return;
         }
 
-        let mut cursor = Cursor::new(self, edit, src);
+        let mut cursor = Cursor::new(self, (span.0, span.0 + edit_len));
         self.root = cursor.parse(&0).unwrap();
+    }
+}
+
+impl<'a> Document<'a> {
+    pub fn edit(&mut self, span: Span, edit: &str) {
+        self.text.replace_range(span.0..span.1, edit);
+        self.parse(span, edit.len());
     }
 
     pub fn node_iter<'b>(&'b self) -> NodeIter<'a, 'b> {
         return NodeIter::new(self);
     }
 }
+
