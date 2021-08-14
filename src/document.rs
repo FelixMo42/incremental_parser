@@ -1,13 +1,7 @@
 use crate::language::{Cursor, Language, Node};
-use log::info;
 use std::rc::Rc;
 
 pub type Span = (usize, usize);
-
-pub struct Edit {
-    pub span: Span,
-    pub len: usize,
-}
 
 pub struct Step<'a, 'b> {
     node: &'b Rc<Node<'a>>,
@@ -71,8 +65,8 @@ impl<'a, 'b> NodeIter<'a, 'b> {
 
 pub struct Document<'a> {
     pub lang: &'a Language,
-    pub text: String,
     pub root: Rc<Node<'a>>,
+    pub text: String,
 }
 
 fn incrament_node(node: &mut Rc<Node>, removed: usize, added: usize, start: usize) {
@@ -111,8 +105,6 @@ impl<'a> Document<'a> {
         // How much was removed?
         let removed = span.1 - span.0;
 
-        info!("parsing");
-
         incrament_node(&mut self.root, removed, edit_len, span.0);
 
         if self.text.len() == 0 {
@@ -120,6 +112,7 @@ impl<'a> Document<'a> {
         }
 
         let mut cursor = Cursor::new(self, (span.0, span.0 + edit_len));
+
         self.root = cursor.parse(&0).unwrap();
     }
 }
@@ -127,7 +120,12 @@ impl<'a> Document<'a> {
 impl<'a> Document<'a> {
     pub fn edit(&mut self, span: Span, edit: &str) {
         self.text.replace_range(span.0..span.1, edit);
+
         self.parse(span, edit.len());
+    }
+
+    pub fn read(&mut self, index: usize) -> Option<char> {
+        return self.text.chars().nth(index);
     }
 
     pub fn node_iter<'b>(&'b self) -> NodeIter<'a, 'b> {

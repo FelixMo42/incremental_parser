@@ -1,10 +1,11 @@
 pub mod document;
 pub mod language;
 
-use crate::document::{Document, Edit};
+use crate::document::Document;
 use crate::language::{Node, Rule, Step, Token};
 use simplelog::{Config, WriteLogger};
 use std::fs::File;
+use std::io::Write;
 use std::ops::RangeInclusive;
 use std::rc::Rc;
 use std::str::Chars;
@@ -53,9 +54,11 @@ impl Rule for Symbol {
     }
 }
 
+const WHITE: Color = Color(200, 200, 200);
+
 fn make_language() -> Vec<Box<dyn Rule>> {
     let word = Symbol::new(
-        Some(Color(200, 200, 200)),
+        Some(WHITE),
         vec![
             Step(
                 vec![
@@ -80,7 +83,7 @@ fn make_language() -> Vec<Box<dyn Rule>> {
     );
 
     let whitespace = Symbol::new(
-        Some(Color(0, 0, 0)),
+        Some(WHITE),
         vec![Step(vec![(('\t'..=' '), 0)], true)],
     );
 
@@ -132,6 +135,122 @@ fn out(screen: &mut Screen, node: &Rc<Node>, chars: &mut Chars, cord: &mut Vec2<
     }
 }
 
+struct Cursor<'a> {
+    position: Vec2<usize>,
+    document: Document<'a>,
+    sticky_x: usize,
+    index: usize,
+}
+
+impl<'a> Cursor<'a> {
+    fn write(&mut self, input: &str) {
+        self.document.edit((self.index, self.index), input);
+        self.position.x += input.len(); 
+        self.index += input.len();
+    }
+
+    fn new_line(&mut self) {
+        self.document.edit((self.index, self.index), "\n");
+        self.position.y += 1;
+        self.position.x = 0;
+        self.index += 1;
+    }
+
+    fn delete(&mut self) {
+        if self.index == 0 {
+            return
+        }
+
+        self.document.edit((self.index - 1, self.index), "");
+
+        self.prev_char();
+    }
+}
+
+impl<'a> Cursor<'a> {
+    fn next(&mut self) {
+        if let Some(chr) = self.document.read(self.index) {
+            if chr == '\n' {
+                self.position.y += 1;
+                self.position.x = 0;
+            } else {
+                self.position.x += 1;
+            }
+
+            self.index += 1;
+        }
+    }
+
+    fn prev(&mut self) {
+        if self.index == 0 {
+            return
+        }
+
+        self.index -= 1;
+
+        if self.position.x == 0 {
+            self.position.y -= 1;
+            self.position.x = 0;
+            
+            if self.position.y == 0 {
+                self.position.x = self.index;
+                return
+            }
+            
+            while self.is_newline(self.index - self.position.x - 1) {
+                self.position.x += 1;
+            }
+        } else {
+            self.position.x -= 1;
+        }
+    }
+
+    fn next_char(&mut self) {
+        self.next();
+        self.sticky_x = self.position.x;
+    }
+
+    fn prev_char(&mut self) {
+        self.prev();
+        self.sticky_x = self.position.x;
+    }
+
+    fn next_line(&mut self) {
+        // move to next line
+        self.next();
+        while self.position.x != 0 && self.index < self.document.text.len() {
+            self.next();
+        }
+
+        // move back to the previous x value, or to the end of line
+        while self.sticky_x != self.position.x && self.is_newline(self.index) {
+            self.next();
+        }
+    }
+
+    fn prev_line(&mut self) {
+        // we cant go to previous line, if were at the first line
+        if self.position.y == 0 {
+            return
+        }
+
+        // move down to previous line
+        self.prev();
+        while self.is_newline(self.index) {
+            self.prev()
+        }
+
+        // move down to correct position in line
+        while self.position.x > self.sticky_x {
+            self.prev()
+        }
+    }
+
+    fn is_newline(&mut self, index: usize) -> bool {
+        return self.document.read(index).map_or(false, |c| c != '\n');
+    }
+}
+
 fn main() {
     WriteLogger::init(
         log::LevelFilter::Info,
@@ -141,51 +260,53 @@ fn main() {
     .unwrap();
 
     let language = make_language();
-    let mut doc = Document::new(&language);
+    let document = Document::new(&language);
 
     let mut screen = Screen::new();
-    let mut index = 0;
+
+    let mut cursor = Cursor {
+        position: Vec2::new(0, 0),
+        sticky_x: 0,
+        index: 0,
+        document,
+    };
+
+    screen.show_cursor();
 
     for event in screen.events() {
         match event.unwrap() {
-            Event::Key(Key::Char('\t')) => {
-                doc.edit((index, index), "    ");
-                index += 4;
+            // input new text
+            Event::Key(Key::Char('\n')) => cursor.new_line(),
+            Event::Key(Key::Char('\t')) => cursor.write("   "),
+            Event::Key(Key::Char(chr)) => cursor.write(chr.to_string().as_str()),
 
-            },
-            Event::Key(Key::Char(chr)) => {
-                doc.edit((index, index), chr.to_string().as_str());
-                index += 1;
-            }
-            Event::Key(Key::Left) => {
-                if index != 0 {
-                    index -= 1;
-                }
-            }
-            Event::Key(Key::Right) => {
-                if index != doc.text.len() {
-                    index += 1;
-                }
-            }
+            // delete text
             Event::Key(Key::Backspace) => {
-                if index != 0 {
-                    doc.edit((index - 1, index), "");
+                cursor.delete();
+                screen.set(' ', WHITE, &cursor.position);
+            },
 
-                    screen.set(' ', Color(0, 0, 0), &Vec2::new(doc.text.len(), 0));
+            // move the cursor
+            Event::Key(Key::Left)  => cursor.prev_char(),
+            Event::Key(Key::Right) => cursor.next_char(),
+            Event::Key(Key::Up)    => cursor.prev_line(),
+            Event::Key(Key::Down)  => cursor.next_line(),
 
-                    index -= 1;
-                }
-            }
+            // quit if unexpected input
             _ => break,
         }
 
         out(
             &mut screen,
-            &doc.root,
-            &mut doc.text.chars(),
+            &cursor.document.root,
+            &mut cursor.document.text.chars(),
             &mut Vec2::new(0, 0),
         );
 
         screen.blit();
+
+        screen.move_cursor(&cursor.position);
+        screen.out.flush().unwrap();
     }
 }
+

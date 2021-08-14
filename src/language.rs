@@ -1,4 +1,4 @@
-use crate::document::{Document, Edit, NodeIter, Span};
+use crate::document::{Document, NodeIter, Span};
 use std::{iter::Peekable, rc::Rc, str::CharIndices};
 use tblit::screen::Color;
 
@@ -205,3 +205,4 @@ impl Rule for Token {
         return self.color.clone();
     }
 }
+
