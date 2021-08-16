@@ -1,25 +1,20 @@
 //! A collection of rules to make a language.
 
 // Child modules
-mod symbol;
 mod automata; 
+mod symbol;
 
 // Publish
-pub use symbol::*;
 pub use automata::*;
+pub use symbol::*;
 
 use std::rc::Rc;
-use tblit::RGB;
-use crate::document::{Parser, Node};
+use crate::document::*;
 
 /// A rule for parsing.
 pub trait Rule {
     /// Parse the rule.
-    fn parse<'a>(&self, cursor: &mut Parser<'a, '_>) -> Option<Vec<Rc<Node<'a>>>>;
-
-    /// The color that this node should be displayed as.
-    /// If None, then it will display each of the child nodes in their colors.
-    fn get_color(&self) -> Option<RGB>;
+    fn parse<'a>(&self, cursor: &mut Parser<'a, '_>) -> Option<(Kind, Vec<Rc<Node<'a>>>)>;
 }
 
 impl PartialEq for dyn Rule {

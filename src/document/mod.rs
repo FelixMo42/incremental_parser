@@ -16,6 +16,16 @@ use crate::rules::{Language, Rule};
 /// A span of the document in bytes.
 pub type Span = (usize, usize);
 
+/// Possible kind for a node.
+#[derive(Clone, Copy)]
+pub enum Kind {
+    File,
+    Whitespace,
+    Name,
+    Number,
+    Punctuation,
+}
+
 /// A node in the document.
 pub struct Node<'a> {
     /// The span of the node in the document.
@@ -24,11 +34,12 @@ pub struct Node<'a> {
     /// What rule created the node.
     pub rule: &'a Box<dyn Rule>,
 
+    /// The kind of node it is.
+    pub kind: Kind,
+
     /// The sub value of the nodes.
     pub subs: Vec<Rc<Node<'a>>>,
 }
-
-
 
 /// Updates the span of all the nodes when the document is changed.
 fn incrament_node(node: &mut Rc<Node>, removed: usize, added: usize, start: usize) {
@@ -69,6 +80,7 @@ impl<'a> Document<'a> {
             root: Rc::new(Node {
                 span: (0, 0),
                 rule: &language[0],
+                kind: Kind::File,
                 subs: vec![],
             }),
         };

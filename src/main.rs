@@ -30,53 +30,53 @@ pub const BLUE: RGB = RGB(0, 110, 114);
 pub const ORANGE: RGB = RGB(186, 107, 71);
 
 fn make_language() -> Vec<Box<dyn Rule>> {
-    let word = Symbol::new(WHITE, vec![
+    let word = Symbol::new(vec![
         Step(vec![
             (('a'..='z'), 1),
             (('A'..='Z'), 1),
             (('_'..='_'), 1),
             (('\''..='\''), 1),
-        ], true),
+        ], Some(Kind::Name)),
         Step(vec![
             (('a'..='z'), 1),
             (('A'..='Z'), 1),
             (('_'..='_'), 1),
             (('0'..='9'), 1),
             (('\''..='\''), 1),
-        ], true),
+        ], Some(Kind::Name)),
     ]);
 
-    let whitespace = Symbol::new(WHITE, vec![
+    let whitespace = Symbol::new(vec![
         Step(vec![
              (('\t'..=' '), 0)
-        ], true)
+        ], Some(Kind::Whitespace))
     ]);
 
-    let punctuation = Symbol::new(ORANGE, vec![
+    let punctuation = Symbol::new(vec![
         Step(vec![
              (('!'..='/'), 0),
              ((':'..='@'), 0),
              (('{'..='~'), 0),
-        ], true)
+        ], Some(Kind::Punctuation))
     ]);
 
-    let number = Symbol::new(BLUE, vec![
+    let number = Symbol::new(vec![
         Step(vec![
              (('0'..='9'), 0),
              (('.'..='.'), 1)
-        ], true),
+        ], Some(Kind::Number)),
         Step(vec![
              (('0'..='9'), 1)
-        ], true),
+        ], Some(Kind::Number)),
     ]);
 
-    let file = Automata::new(None, vec![
+    let file = Automata::new(vec![
         Step(vec![
              (1, 0),
              (2, 0),
              (3, 0),
              (4, 0),
-        ], true)
+        ], Some(Kind::File))
     ]);
 
     return vec![
@@ -91,8 +91,18 @@ fn make_language() -> Vec<Box<dyn Rule>> {
     ];
 }
 
+fn color(kind: Kind) -> Option<RGB> {
+    match kind {
+        Kind::File => None,
+        Kind::Whitespace => Some(WHITE),
+        Kind::Name => Some(WHITE),
+        Kind::Number => Some(BLUE),
+        Kind::Punctuation => Some(ORANGE),
+    }
+}
+
 fn out(screen: &mut Screen<Color>, doc: &Document, node: &Rc<Node>, cord: &mut Vec2<usize>) {
-    if let Some(color) = node.rule.get_color() {
+    if let Some(color) = color(node.kind) {
         for i in node.span.0..node.span.1 {
             if let Some(chr) = doc.text.read(i) {
                 if chr != '\n' {

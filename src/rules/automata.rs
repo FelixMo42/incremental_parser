@@ -1,10 +1,9 @@
 use std::rc::Rc;
-use tblit::RGB;
-use crate::document::{Node, Parser};
+use crate::document::{Kind, Node, Parser};
 use super::Rule;
 
 /// A step in the automata.
-pub struct Step<T>(pub Vec<(T, usize)>, pub bool);
+pub struct Step<T>(pub Vec<(T, usize)>, pub Option<Kind>);
 
 impl<T> Step<T> {
     /// The edges of this step.
@@ -13,29 +12,26 @@ impl<T> Step<T> {
     }
 
     /// Is the Step a possible end of the node?
-    pub fn is_final(&self) -> bool {
+    pub fn kind(&self) -> Option<Kind> {
         return self.1;
     }
 }
 
 /// A recusice definite finite automata rule.
 pub struct Automata {
-    /// A base symbol must have a color, as it never has any children.
-    color: Option<RGB>,
-    
     /// The Steps in the dfa.
     steps: Vec<Step<usize>>,
 }
 
 impl Automata {
     /// Constructor for the automata.
-    pub fn new(color: Option<RGB>, steps: Vec<Step<usize>>) -> Box<dyn Rule> {
-        return Box::new(Automata { color, steps });
+    pub fn new(steps: Vec<Step<usize>>) -> Box<dyn Rule> {
+        return Box::new(Automata { steps });
     }
 }
 
 impl Rule for Automata {
-    fn parse<'a>(&self, cursor: &mut Parser<'a, '_>) -> Option<Vec<Rc<Node<'a>>>> {
+    fn parse<'a>(&self, cursor: &mut Parser<'a, '_>) -> Option<(Kind, Vec<Rc<Node<'a>>>)> {
         let mut subs = vec![];
         let mut step = 0;
 
@@ -51,17 +47,11 @@ impl Rule for Automata {
             }
         }) {}
 
-        let success = self.steps[step].is_final();
-
-        if success {
-            return Some(subs);
+        if let Some(kind) = self.steps[step].kind() {
+            return Some((kind, subs));
         } else {
             return None;
         }
-    }
-
-    fn get_color(&self) -> Option<RGB> {
-        return self.color.clone();
     }
 }
 

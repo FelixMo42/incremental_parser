@@ -54,9 +54,11 @@ impl<'a, 'b> Parser<'a, 'b> {
 impl<'a> Parser<'a, '_> {
     /// Eats a character if it matches the given func.
     pub fn next_if(&mut self, func: impl FnOnce(&char) -> bool) -> bool {
-        if self.document.text.read(self.offset).map_or(false, |c| func(&c)) {
-            self.offset += 1;
-            return true;
+        if let Some(chr) = self.document.text.read(self.offset) {
+            if func(&chr) {
+                self.offset += 1;
+                return true;
+            }
         }
 
         return false;
@@ -78,7 +80,7 @@ impl<'a> Parser<'a, '_> {
             return Some(node.clone());
         }
 
-        if let Some(subs) = rule.parse(self) {
+        if let Some((kind, subs)) = rule.parse(self) {
             // If we havent advanced at all, then this is a failure 
             if self.offset == offset {
                 return None;
@@ -87,8 +89,7 @@ impl<'a> Parser<'a, '_> {
             // Succses! Make a new node and return it. 
             return Some(Rc::new(Node {
                 span: (offset, self.offset),
-                subs,
-                rule,
+                subs, kind, rule,
             }));
         }
 
