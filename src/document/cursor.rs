@@ -1,4 +1,4 @@
-use tblit::vec2::Vec2;
+use tblit::Vec2;
 use crate::document::Document;
 
 /// Document user cursor.
