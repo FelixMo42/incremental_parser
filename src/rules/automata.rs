@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use tblit::screen::Color;
+use tblit::RGB;
 use crate::document::{Node, Parser};
 use super::Rule;
 
@@ -21,7 +21,7 @@ impl<T> Step<T> {
 /// A recusice definite finite automata rule.
 pub struct Automata {
     /// A base symbol must have a color, as it never has any children.
-    color: Option<Color>,
+    color: Option<RGB>,
     
     /// The Steps in the dfa.
     steps: Vec<Step<usize>>,
@@ -29,7 +29,7 @@ pub struct Automata {
 
 impl Automata {
     /// Constructor for the automata.
-    pub fn new(color: Option<Color>, steps: Vec<Step<usize>>) -> Box<dyn Rule> {
+    pub fn new(color: Option<RGB>, steps: Vec<Step<usize>>) -> Box<dyn Rule> {
         return Box::new(Automata { color, steps });
     }
 }
@@ -60,7 +60,7 @@ impl Rule for Automata {
         }
     }
 
-    fn get_color(&self) -> Option<Color> {
+    fn get_color(&self) -> Option<RGB> {
         return self.color.clone();
     }
 }

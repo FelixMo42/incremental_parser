@@ -9,7 +9,7 @@ pub use symbol::*;
 pub use automata::*;
 
 use std::rc::Rc;
-use tblit::screen::Color;
+use tblit::RGB;
 use crate::document::{Parser, Node};
 
 /// A rule for parsing.
@@ -19,7 +19,7 @@ pub trait Rule {
 
     /// The color that this node should be displayed as.
     /// If None, then it will display each of the child nodes in their colors.
-    fn get_color(&self) -> Option<Color>;
+    fn get_color(&self) -> Option<RGB>;
 }
 
 impl PartialEq for dyn Rule {

@@ -1,12 +1,12 @@
 use std::{ops::RangeInclusive, rc::Rc};
-use tblit::screen::Color;
 use crate::document::{Node, Parser};
+use tblit::RGB;
 use super::{Rule, Step};
 
 /// A simpled definite finite automata rule for creating base lexing.
 pub struct Symbol {
     /// A base symbol must have a color, as it never has any children.
-    color: Color,
+    color: RGB,
 
     /// The Steps in the dfa.
     steps: Vec<Step<RangeInclusive<char>>>,
@@ -14,7 +14,7 @@ pub struct Symbol {
 
 impl Symbol {
     /// Initializes a new Symbol.
-    pub fn new(color: Color, steps: Vec<Step<RangeInclusive<char>>>) -> Box<dyn Rule> {
+    pub fn new(color: RGB, steps: Vec<Step<RangeInclusive<char>>>) -> Box<dyn Rule> {
         return Box::new(Symbol { color, steps });
     }
 }
@@ -42,7 +42,7 @@ impl Rule for Symbol {
         }
     }
 
-    fn get_color(&self) -> Option<Color> {
+    fn get_color(&self) -> Option<RGB> {
         return Some(self.color);
     }
 }

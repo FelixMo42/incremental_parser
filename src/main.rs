@@ -8,16 +8,26 @@ pub mod rules;
 
 use crate::rules::*;
 use crate::document::*;
-use simplelog::{Config, WriteLogger};
-use std::fs::File;
-use std::io::Write;
-use std::rc::Rc;
-use tblit::vec2::Vec2;
-use tblit::event::{Event, Key};
-use tblit::screen::{Color, Screen};
 
-/// Just the color off white.
-pub const WHITE: Color = Color(200, 200, 200);
+use simplelog::{Config, WriteLogger};
+
+use std::fs::File;
+use std::rc::Rc;
+
+use tblit::*;
+use tblit::event::*;
+
+/// Gray
+pub const WHITE: RGB = RGB(153, 174, 168);
+
+/// Black
+pub const GRAY: RGB = RGB(10, 10, 10);
+
+/// Blue
+pub const BLUE: RGB = RGB(0, 110, 114);
+
+/// Orange
+pub const ORANGE: RGB = RGB(186, 107, 71);
 
 fn make_language() -> Vec<Box<dyn Rule>> {
     let word = Symbol::new(WHITE, vec![
@@ -42,14 +52,15 @@ fn make_language() -> Vec<Box<dyn Rule>> {
         ], true)
     ]);
 
-    let punctuation = Symbol::new(Color(186, 108, 72), vec![
+    let punctuation = Symbol::new(ORANGE, vec![
         Step(vec![
              (('!'..='/'), 0),
-             ((':'..='@'), 0)
+             ((':'..='@'), 0),
+             (('{'..='~'), 0),
         ], true)
     ]);
 
-    let number = Symbol::new(Color(1, 110, 115), vec![
+    let number = Symbol::new(BLUE, vec![
         Step(vec![
              (('0'..='9'), 0),
              (('.'..='.'), 1)
@@ -64,7 +75,7 @@ fn make_language() -> Vec<Box<dyn Rule>> {
              (1, 0),
              (2, 0),
              (3, 0),
-             (4, 0)
+             (4, 0),
         ], true)
     ]);
 
@@ -80,12 +91,16 @@ fn make_language() -> Vec<Box<dyn Rule>> {
     ];
 }
 
-fn out(screen: &mut Screen, doc: &Document, node: &Rc<Node>, cord: &mut Vec2<usize>) {
+fn out(screen: &mut Screen<Color>, doc: &Document, node: &Rc<Node>, cord: &mut Vec2<usize>) {
     if let Some(color) = node.rule.get_color() {
         for i in node.span.0..node.span.1 {
             if let Some(chr) = doc.text.read(i) {
                 if chr != '\n' {
-                    screen.set(chr, color, &Vec2::new(cord.x, cord.y));
+                    screen.set(&cord, chr, Color {
+                        fg: color,
+                        bg: GRAY,
+                    });
+
                     cord.x += 1;
                 } else {
                     cord.y += 1;
@@ -110,10 +125,16 @@ fn main() {
     let language = make_language();
     let mut document = Document::new(&language);
 
-    let mut screen = Screen::new();
     let mut cursor = Cursor::new();
 
+    let mut screen = Screen::new(Color {
+        fg: WHITE,
+        bg: GRAY,
+    });
+
+    screen.blit();
     screen.show_cursor();
+    screen.move_cursor(&cursor.position.into());
 
     for event in screen.events() {
         match event.unwrap() {
@@ -124,7 +145,6 @@ fn main() {
             // delete text
             Event::Key(Key::Backspace) => {
                 cursor.delete(&mut document);
-                screen.set(' ', WHITE, &cursor.position);
             },
 
             // move the cursor
@@ -145,9 +165,7 @@ fn main() {
         );
 
         screen.blit();
-
         screen.move_cursor(&cursor.position.into());
-        screen.out.flush().unwrap();
     }
 }
 
