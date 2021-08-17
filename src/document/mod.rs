@@ -10,20 +10,22 @@ pub use cursor::Cursor;
 pub use parser::Parser;
 pub use nodeiter::NodeIter;
 
-use std::rc::Rc;
+use std::{rc::Rc, str::CharIndices};
 use crate::rules::{Language, Rule};
 
 /// A span of the document in bytes.
 pub type Span = (usize, usize);
 
 /// Possible kind for a node.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     File,
     Whitespace,
     Name,
     Number,
     Punctuation,
+    Error,
+    EqualExpression,
 }
 
 /// A node in the document.
@@ -114,6 +116,40 @@ impl<'a> Document<'a> {
     pub fn node_iter<'b>(&'b self) -> NodeIter<'a, 'b> {
         return NodeIter::new(self);
     }
+    
+    ///
+    pub fn get<'b>(&'b self, offset: usize) -> Rc<Node<'a>> {
+        let mut node = &self.root;
+        
+        while let Some(new) = node.subs.iter().find(|node| node.span.0 <= offset && offset < node.span.1) {
+            node = new;
+        }
+
+        return node.clone();
+    }
+
+    ///
+    pub fn get_filter<'b, T>(
+        &'b self,
+        offset: usize,
+        func: impl Fn(&Rc<Node<'a>>) -> Option<T>
+    ) -> Option<T> {
+        let mut node = &self.root;
+
+        if let Some(value) = func(node) {
+            return Some(value);
+        }
+        
+        while let Some(new) = node.subs.iter().find(|node| node.span.0 <= offset && offset < node.span.1) {
+            if let Some(value) = func(new) {
+                return Some(value);
+            }
+
+            node = new;
+        }
+
+        return None;
+    }
 }
 
 /// The Source for a document.
@@ -138,6 +174,11 @@ impl Text {
     /// Get the byte length of the text.
     pub fn byte_len(&self) -> usize {
         self.0.as_bytes().len()
+    }
+
+    ///
+    pub fn chars_indices<'a>(&'a self) -> CharIndices<'a> {
+        self.0.char_indices()
     }
 }
 

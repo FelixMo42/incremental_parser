@@ -3,10 +3,12 @@
 // Child modules
 mod automata; 
 mod symbol;
+mod lexer;
 
 // Publish
 pub use automata::*;
 pub use symbol::*;
+pub use lexer::*;
 
 use std::rc::Rc;
 use crate::document::*;
@@ -14,7 +16,7 @@ use crate::document::*;
 /// A rule for parsing.
 pub trait Rule {
     /// Parse the rule.
-    fn parse<'a>(&self, cursor: &mut Parser<'a, '_>) -> Option<(Kind, Vec<Rc<Node<'a>>>)>;
+    fn parse<'a>(&self, parser: &mut Parser<'a, '_>) -> Option<(Kind, Vec<Rc<Node<'a>>>)>;
 }
 
 impl PartialEq for dyn Rule {

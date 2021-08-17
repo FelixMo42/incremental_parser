@@ -16,7 +16,7 @@ pub fn parse<'a, 'b>(document: &'b Document<'a>, edit: Span) -> Rc<Node<'a>> {
 /// Updates the parse tree for a document.
 pub struct Parser<'a, 'b> {
     /// The current position in the text in bytes.
-    offset: usize,
+    pub offset: usize,
 
     /// The document we want to update.
     document: &'b Document<'a>,
@@ -65,14 +65,11 @@ impl<'a> Parser<'a, '_> {
     }
 
     /// Eat as long as a Rule matches.
-    pub fn parse(&mut self, rule_index: usize) -> Option<Rc<Node<'a>>> {
-        let rule = &self.document.lang[rule_index];
-
-        // Keep a copy of the current offset in the document.
-        let offset = self.offset;
+    pub fn parse(&mut self, rule: usize) -> Option<Rc<Node<'a>>> {
+        let rule = &self.document.lang[rule];
 
         // Check to see if we have this one memorized.
-        if let Some(node) = self.get_node(rule, offset) {
+        if let Some(node) = self.get_node(rule, self.offset) {
             // If we do have one, then skip the cursor past it.
             self.offset = node.span.1;
 
@@ -80,13 +77,15 @@ impl<'a> Parser<'a, '_> {
             return Some(node.clone());
         }
 
+        // Keep a copy of the old offset
+        let offset = self.offset;
+
+        // Try to parse the rule
         if let Some((kind, subs)) = rule.parse(self) {
-            // If we havent advanced at all, then this is a failure 
-            if self.offset == offset {
+            if offset == self.offset {
                 return None;
             }
 
-            // Succses! Make a new node and return it. 
             return Some(Rc::new(Node {
                 span: (offset, self.offset),
                 subs, kind, rule,

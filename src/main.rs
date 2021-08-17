@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! An incramental parser, and a simple terminal ide for testing it.
 
 // Publish the children modules
@@ -12,7 +10,6 @@ use crate::document::*;
 use simplelog::{Config, WriteLogger};
 
 use std::fs::File;
-use std::rc::Rc;
 
 use tblit::*;
 use tblit::event::*;
@@ -30,97 +27,114 @@ pub const BLUE: RGB = RGB(0, 110, 114);
 pub const ORANGE: RGB = RGB(186, 107, 71);
 
 fn make_language() -> Vec<Box<dyn Rule>> {
-    let word = Symbol::new(vec![
+    let lexer = Lexer::new(vec![
         Step(vec![
-            (('a'..='z'), 1),
-            (('A'..='Z'), 1),
-            (('_'..='_'), 1),
-            (('\''..='\''), 1),
+            // Whitespace
+            (('\t'..=' '), 1),
+
+            // Word
+            (('a'..='z'), 2),
+            (('A'..='Z'), 2),
+            (('_'..='_'), 2),
+            (('\''..='\''), 2),
+
+            // Punctuation
+            (('!'..='/'), 3),
+            ((':'..='@'), 3),
+            (('{'..='~'), 3),
+
+            // Number
+            (('0'..='9'), 4),
+        ], None),
+
+        // Whitespace
+        Step(vec![
+             (('\t'..=' '), 1)
+        ], Some(Kind::Whitespace)),
+
+        // Word
+        Step(vec![
+            (('a'..='z'), 2),
+            (('A'..='Z'), 2),
+            (('_'..='_'), 2),
+            (('0'..='9'), 2),
+            (('\''..='\''), 2),
         ], Some(Kind::Name)),
-        Step(vec![
-            (('a'..='z'), 1),
-            (('A'..='Z'), 1),
-            (('_'..='_'), 1),
-            (('0'..='9'), 1),
-            (('\''..='\''), 1),
-        ], Some(Kind::Name)),
-    ]);
 
-    let whitespace = Symbol::new(vec![
+        // Punctuation
         Step(vec![
-             (('\t'..=' '), 0)
-        ], Some(Kind::Whitespace))
-    ]);
+        ], Some(Kind::Punctuation)),
 
-    let punctuation = Symbol::new(vec![
+        // Number
         Step(vec![
-             (('!'..='/'), 0),
-             ((':'..='@'), 0),
-             (('{'..='~'), 0),
-        ], Some(Kind::Punctuation))
-    ]);
-
-    let number = Symbol::new(vec![
-        Step(vec![
-             (('0'..='9'), 0),
-             (('.'..='.'), 1)
+             (('0'..='9'), 4),
+             (('.'..='.'), 5)
         ], Some(Kind::Number)),
         Step(vec![
-             (('0'..='9'), 1)
+             (('0'..='9'), 5)
         ], Some(Kind::Number)),
     ]);
 
     let file = Automata::new(vec![
         Step(vec![
-             (1, 0),
-             (2, 0),
-             (3, 0),
-             (4, 0),
+             ((2, Kind::EqualExpression), 0),
+             ((2, Kind::Error), 0)
         ], Some(Kind::File))
     ]);
 
-    return vec![
-        // Root rule
-        file,        // 0
+    let assign = Automata::new(vec![
+        Step(vec![
+             ((1, Kind::Name), 1),
+        ], Some(Kind::Error)),
+        Step(vec![
+             ((1, Kind::Punctuation), 2),
+        ], Some(Kind::Error)),
+        Step(vec![
+             ((1, Kind::Number), 3),
+        ], Some(Kind::Error)),
+        Step(vec![
+        ], Some(Kind::EqualExpression)),
+    ]);
 
-        // Lexer bits
-        whitespace,  // 1
-        punctuation, // 2
-        word,        // 3
-        number,      // 4
+    return vec![
+        file,        // 0
+        lexer,       // 1
+
+        // Expressions
+        assign,      // 2
     ];
 }
 
-fn color(kind: Kind) -> Option<RGB> {
-    match kind {
-        Kind::File => None,
-        Kind::Whitespace => Some(WHITE),
-        Kind::Name => Some(WHITE),
-        Kind::Number => Some(BLUE),
-        Kind::Punctuation => Some(ORANGE),
-    }
+fn color(doc: &Document, index: usize) -> Option<RGB> {
+    doc.get_filter(index, |node| {
+        match node.kind {
+            Kind::EqualExpression |
+            Kind::File => None,
+
+            Kind::Whitespace  => Some(WHITE),
+            Kind::Name        => Some(WHITE),
+            Kind::Number      => Some(BLUE),
+            Kind::Punctuation => Some(ORANGE),
+
+            Kind::Error => Some(ORANGE),
+        }
+    })
 }
 
-fn out(screen: &mut Screen<Color>, doc: &Document, node: &Rc<Node>, cord: &mut Vec2<usize>) {
-    if let Some(color) = color(node.kind) {
-        for i in node.span.0..node.span.1 {
-            if let Some(chr) = doc.text.read(i) {
-                if chr != '\n' {
-                    screen.set(&cord, chr, Color {
-                        fg: color,
-                        bg: GRAY,
-                    });
-
-                    cord.x += 1;
-                } else {
-                    cord.y += 1;
-                    cord.x = 0;
-                }
-            }
+fn out(screen: &mut Screen<Color>, doc: &Document, cord: &mut Vec2<usize>) {
+    for (i, chr) in doc.text.chars_indices() {
+        if let Some(color) = color(doc, i) {
+            screen.set(&cord, chr, Color {
+                fg: color,
+                bg: GRAY,
+            });
         }
-    } else {
-        for node in node.subs.iter() {
-            out(screen, doc, node, cord);
+
+        if chr == '\n' {
+            cord.y += 1;
+            cord.x = 0;
+        } else {
+            cord.x += 1;
         }
     }
 }
@@ -170,7 +184,6 @@ fn main() {
         out(
             &mut screen,
             &document,
-            &document.root,
             &mut Vec2::new(0, 0),
         );
 

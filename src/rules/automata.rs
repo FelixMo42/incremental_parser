@@ -20,23 +20,23 @@ impl<T> Step<T> {
 /// A recusice definite finite automata rule.
 pub struct Automata {
     /// The Steps in the dfa.
-    steps: Vec<Step<usize>>,
+    steps: Vec<Step<(usize, Kind)>>,
 }
 
 impl Automata {
     /// Constructor for the automata.
-    pub fn new(steps: Vec<Step<usize>>) -> Box<dyn Rule> {
+    pub fn new(steps: Vec<Step<(usize, Kind)>>) -> Box<dyn Rule> {
         return Box::new(Automata { steps });
     }
 }
 
 impl Rule for Automata {
-    fn parse<'a>(&self, cursor: &mut Parser<'a, '_>) -> Option<(Kind, Vec<Rc<Node<'a>>>)> {
+    fn parse<'a>(&self, parser: &mut Parser<'a, '_>) -> Option<(Kind, Vec<Rc<Node<'a>>>)> {
         let mut subs = vec![];
         let mut step = 0;
 
-        while self.steps[step].rules().iter().any(|(rule, i)| {
-            if let Some(node) = cursor.parse(*rule) {
+        while self.steps[step].rules().iter().any(|((rule, kind), i)| {
+            if let Some(node) = parser.parse(*rule) {
                 subs.push(node);
 
                 step = *i;
